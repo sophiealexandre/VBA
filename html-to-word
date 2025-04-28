@@ -1,17 +1,14 @@
-Sub ExportHTMLFromI_NamedFromS()
+Sub ExportHTMLFromI_NamedSimpleNumber()
     Dim WordApp As Object
     Dim WordDoc As Object
     Dim ws As Worksheet
     Dim i As Integer
     Dim htmlText As String
-    Dim fileNameText As String
     Dim objHtml As Object
     Dim objElements As Object
     Dim objElement As Object
     Dim folderPath As String
-    Dim cleanFileName As String
     Dim fNameTest As String
-    Dim fileIndex As Integer
 
     ' Définir la feuille active
     Set ws = ThisWorkbook.Sheets(1)
@@ -27,7 +24,6 @@ Sub ExportHTMLFromI_NamedFromS()
     ' Boucle sur les 10 premières lignes
     For i = 1 To 10
         htmlText = ws.Cells(i, 9).Value ' Colonne I = contenu HTML
-        fileNameText = ws.Cells(i, 19).Value ' Colonne S = nom du fichier
         
         If Trim(htmlText) <> "" Then
             ' Charger le HTML
@@ -59,7 +55,7 @@ Sub ExportHTMLFromI_NamedFromS()
                         Case "br"
                             WordDoc.Content.InsertAfter vbCrLf
                         Case "ul"
-                            ' Ne rien faire ici
+                            ' Rien ici
                         Case "li"
                             If Trim(objElement.innerText) <> "" Then
                                 AddBullet WordDoc, objElement.innerText
@@ -68,30 +64,8 @@ Sub ExportHTMLFromI_NamedFromS()
                 Next objElement
             End If
 
-            ' Nettoyer et sécuriser le nom de fichier directement
-            fileNameText = Trim(fileNameText)
-            If fileNameText = "" Then fileNameText = "Sans_Titre_" & i
-
-            cleanFileName = fileNameText
-            cleanFileName = Replace(cleanFileName, "/", "")
-            cleanFileName = Replace(cleanFileName, "\", "")
-            cleanFileName = Replace(cleanFileName, ":", "")
-            cleanFileName = Replace(cleanFileName, "*", "")
-            cleanFileName = Replace(cleanFileName, "?", "")
-            cleanFileName = Replace(cleanFileName, """", "")
-            cleanFileName = Replace(cleanFileName, "<", "")
-            cleanFileName = Replace(cleanFileName, ">", "")
-            cleanFileName = Replace(cleanFileName, "|", "")
-            cleanFileName = Trim(cleanFileName)
-            If cleanFileName = "" Then cleanFileName = "Sans_Titre_" & i
-
-            ' Vérifier si le fichier existe déjà
-            fNameTest = folderPath & cleanFileName & ".docx"
-            fileIndex = 1
-            Do While Dir(fNameTest) <> ""
-                fNameTest = folderPath & cleanFileName & "_" & fileIndex & ".docx"
-                fileIndex = fileIndex + 1
-            Loop
+            ' Définir un nom de fichier simple basé sur le numéro de ligne
+            fNameTest = folderPath & i & ".docx"
 
             ' Sauvegarder
             WordDoc.SaveAs fNameTest
