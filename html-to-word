@@ -41,29 +41,32 @@ Sub ExportHTMLFromI_NamedFromS()
 
             ' Récupérer tous les éléments HTML
             Set objElements = objHtml.getElementsByTagName("*")
-            
-            For Each objElement In objElements
-                Select Case LCase(objElement.tagName)
-                    Case "h1"
-                        AddText WordDoc, objElement.innerText, "Heading 1"
-                    Case "h2"
-                        AddText WordDoc, objElement.innerText, "Heading 2"
-                    Case "h3"
-                        AddText WordDoc, objElement.innerText, "Heading 3"
-                    Case "p"
-                        If Trim(objElement.innerText) <> "" Then
-                            AddText WordDoc, objElement.innerText, "Normal"
-                        End If
-                    Case "br"
-                        WordDoc.Content.InsertAfter vbCrLf
-                    Case "ul"
-                        ' Ne rien faire ici
-                    Case "li"
-                        If Trim(objElement.innerText) <> "" Then
-                            AddBullet WordDoc, objElement.innerText
-                        End If
-                End Select
-            Next objElement
+
+            ' Vérifier que objElements est valide avant de boucler
+            If Not objElements Is Nothing Then
+                For Each objElement In objElements
+                    Select Case LCase(objElement.tagName)
+                        Case "h1"
+                            AddText WordDoc, objElement.innerText, "Heading 1"
+                        Case "h2"
+                            AddText WordDoc, objElement.innerText, "Heading 2"
+                        Case "h3"
+                            AddText WordDoc, objElement.innerText, "Heading 3"
+                        Case "p"
+                            If Trim(objElement.innerText) <> "" Then
+                                AddText WordDoc, objElement.innerText, "Normal"
+                            End If
+                        Case "br"
+                            WordDoc.Content.InsertAfter vbCrLf
+                        Case "ul"
+                            ' Ne rien faire ici
+                        Case "li"
+                            If Trim(objElement.innerText) <> "" Then
+                                AddBullet WordDoc, objElement.innerText
+                            End If
+                    End Select
+                Next objElement
+            End If
 
             ' Nettoyer et sécuriser le nom de fichier
             fileNameText = Trim(fileNameText)
@@ -115,7 +118,7 @@ Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     WordDoc.Content.Paragraphs.Add
 End Sub
 
-' ➡️ Nettoyer le nom de fichier SANS utiliser Array
+' ➡️ Nettoyer le nom du fichier sans utiliser Array
 Function CleanFileName(ByVal FileName As String) As String
     FileName = Replace(FileName, "/", "")
     FileName = Replace(FileName, "\", "")
