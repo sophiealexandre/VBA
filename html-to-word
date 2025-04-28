@@ -12,23 +12,22 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
     Dim cleanFileName As String
     Dim fNameTest As String
     Dim fileIndex As Integer
-    Dim isInList As Boolean
 
     ' Définir la feuille active
     Set ws = ThisWorkbook.Sheets(1)
     
-    ' Dossier où enregistrer les fichiers Word
+    ' Créer le dossier Exports s'il n'existe pas
     folderPath = ThisWorkbook.Path & "\Exports\"
     If Dir(folderPath, vbDirectory) = "" Then MkDir folderPath
 
-    ' Créer une instance de Word
+    ' Créer une instance Word
     Set WordApp = CreateObject("Word.Application")
-    WordApp.Visible = False
+    WordApp.Visible = False ' Tu peux mettre True si tu veux voir Word s'ouvrir
 
-    ' Parcourir les 10 premières lignes
+    ' Boucle sur les 10 premières cellules de la colonne I
     For i = 1 To 10
         htmlText = ws.Cells(i, 9).Value ' Colonne I
-        
+
         If Trim(htmlText) <> "" Then
             ' Charger le HTML
             Set objHtml = CreateObject("htmlfile")
@@ -36,14 +35,13 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
             objHtml.Write htmlText
             objHtml.Close
 
-            ' Créer un nouveau document Word
+            ' Créer un document Word
             Set WordDoc = WordApp.Documents.Add
 
             ' Récupérer tous les éléments HTML
             Set objElements = objHtml.getElementsByTagName("*")
             
             TitleText = ""
-            isInList = False
             
             For Each objElement In objElements
                 Select Case LCase(objElement.tagName)
@@ -52,37 +50,32 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
                             TitleText = objElement.innerText
                         End If
                         AddText WordDoc, objElement.innerText, "Heading 1"
-                        isInList = False
                     Case "h2"
                         AddText WordDoc, objElement.innerText, "Heading 2"
-                        isInList = False
                     Case "h3"
                         AddText WordDoc, objElement.innerText, "Heading 3"
-                        isInList = False
                     Case "p"
                         If Trim(objElement.innerText) <> "" Then
                             AddText WordDoc, objElement.innerText, "Normal"
-                            isInList = False
                         End If
                     Case "br"
                         WordDoc.Content.InsertAfter vbCrLf
                     Case "ul"
-                        ' Rien ici, on gère les <li> à l'intérieur
+                        ' Rien à faire ici (on s'occupe des <li>)
                     Case "li"
                         If Trim(objElement.innerText) <> "" Then
                             AddBullet WordDoc, objElement.innerText
-                            isInList = True
                         End If
                 End Select
             Next objElement
 
-            ' Si pas de H1 trouvé, titre par défaut
+            ' Si pas de h1, générer un titre par défaut
             If TitleText = "" Then TitleText = "Sans_Titre_" & i
 
-            ' Nettoyer le titre pour le nom du fichier
+            ' Nettoyer le titre pour créer un nom de fichier
             cleanFileName = CleanFileName(TitleText)
 
-            ' Protection contre doublons
+            ' Vérifier que le fichier n'existe pas déjà
             fNameTest = folderPath & cleanFileName & ".docx"
             fileIndex = 1
             Do While Dir(fNameTest) <> ""
@@ -96,9 +89,10 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
         End If
     Next i
 
-    ' Terminer
+    ' Terminer Word
     WordApp.Quit
-    
+
+    ' Libérer mémoire
     Set WordDoc = Nothing
     Set WordApp = Nothing
     Set objHtml = Nothing
@@ -106,7 +100,7 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
     MsgBox "Export terminé dans : " & folderPath
 End Sub
 
-' Ajoute du texte avec le style donné
+' Ajouter du texte formaté dans Word
 Sub AddText(ByRef WordDoc As Object, ByVal txt As String, ByVal styleName As String)
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
@@ -115,7 +109,7 @@ Sub AddText(ByRef WordDoc As Object, ByVal txt As String, ByVal styleName As Str
     WordDoc.Content.Paragraphs.Add
 End Sub
 
-' Ajoute une puce de liste
+' Ajouter une puce de liste dans Word
 Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
@@ -125,18 +119,16 @@ Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     WordDoc.Content.Paragraphs.Add
 End Sub
 
-' Nettoie un titre pour créer un nom de fichier valide
+' Nettoyer un nom de fichier
 Function CleanFileName(ByVal FileName As String) As String
-    Dim IllegalChars As Variant
+    Dim IllegalChars() As Variant
     Dim i As Integer
 
     IllegalChars = Array("/", "\", ":", "*", "?", """", "<", ">", "|")
 
-    If IsArray(IllegalChars) Then
-        For i = LBound(IllegalChars) To UBound(IllegalChars)
-            FileName = Replace(FileName, IllegalChars(i), "")
-        Next i
-    End If
+    For i = LBound(IllegalChars) To UBound(IllegalChars)
+        FileName = Replace(FileName, IllegalChars(i), "")
+    Next i
 
     CleanFileName = Trim(FileName)
 End Function
