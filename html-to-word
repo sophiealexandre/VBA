@@ -1,4 +1,4 @@
-Sub ExportHTMLFromI_OpenOnly_FrenchStyle_Save()
+Sub ExportHTMLFromI_OpenOnly_FrenchStyle_50()
     Dim WordApp As Object
     Dim WordDoc As Object
     Dim ws As Worksheet
@@ -7,22 +7,16 @@ Sub ExportHTMLFromI_OpenOnly_FrenchStyle_Save()
     Dim objHtml As Object
     Dim objElements As Object
     Dim objElement As Object
-    Dim folderPath As String
-    Dim fNameTest As String
 
     ' Définir la feuille active
     Set ws = ThisWorkbook.Sheets(1)
     
-    ' Définir le dossier Exports
-    folderPath = ThisWorkbook.Path & "\Exports\"
-    If Dir(folderPath, vbDirectory) = "" Then MkDir folderPath
-
     ' Démarrer Word
     Set WordApp = CreateObject("Word.Application")
-    WordApp.Visible = False ' Word caché pendant la création
+    WordApp.Visible = True ' Word visible pour voir les documents
 
-    ' Boucle sur les 10 premières lignes
-    For i = 1 To 10
+    ' Boucle sur les 50 premières lignes
+    For i = 1 To 50
         htmlText = ws.Cells(i, 9).Value ' Colonne I = contenu HTML
         
         If Trim(htmlText) <> "" Then
@@ -64,27 +58,14 @@ Sub ExportHTMLFromI_OpenOnly_FrenchStyle_Save()
                 Next objElement
             End If
 
-            ' Définir le chemin de sauvegarde
-            fNameTest = folderPath & i & ".docx"
-            
-            ' Sauvegarder
-            WordDoc.SaveAs2 fNameTest
-            WordDoc.Close False
+            ' PAS de sauvegarde : le document reste ouvert
         End If
     Next i
 
-    ' Fermer Word
-    WordApp.Quit
-
-    ' Nettoyer
-    Set WordDoc = Nothing
-    Set WordApp = Nothing
-    Set objHtml = Nothing
-
-    MsgBox "Export terminé dans : " & folderPath
+    MsgBox "50 documents Word sont créés et ouverts. Vous pouvez les enregistrer manuellement."
 End Sub
 
-' ➡️ Ajouter du texte avec style français
+' ➡️ Ajoute du texte avec style français
 Sub AddText(ByRef WordDoc As Object, ByVal txt As String, Optional ByVal styleName As String = "")
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
@@ -95,7 +76,7 @@ Sub AddText(ByRef WordDoc As Object, ByVal txt As String, Optional ByVal styleNa
     WordDoc.Content.Paragraphs.Add
 End Sub
 
-' ➡️ Ajouter une puce de liste
+' ➡️ Ajoute une puce de liste
 Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
