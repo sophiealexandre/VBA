@@ -1,4 +1,4 @@
-Sub ExportHTMLFromI_OpenOnly()
+Sub ExportHTMLFromI_OpenOnly_NoStyleError()
     Dim WordApp As Object
     Dim WordDoc As Object
     Dim ws As Worksheet
@@ -13,7 +13,7 @@ Sub ExportHTMLFromI_OpenOnly()
     
     ' Démarrer Word
     Set WordApp = CreateObject("Word.Application")
-    WordApp.Visible = True ' Word est visible
+    WordApp.Visible = True ' Word sera visible
 
     ' Boucle sur les 10 premières lignes
     For i = 1 To 10
@@ -49,7 +49,7 @@ Sub ExportHTMLFromI_OpenOnly()
                         Case "br"
                             WordDoc.Content.InsertAfter vbCrLf
                         Case "ul"
-                            ' Ne rien faire ici
+                            ' Ne rien faire
                         Case "li"
                             If Trim(objElement.innerText) <> "" Then
                                 AddBullet WordDoc, objElement.innerText
@@ -58,30 +58,34 @@ Sub ExportHTMLFromI_OpenOnly()
                 Next objElement
             End If
 
-            ' 🛑 PAS DE SAVEAS ! Le document reste ouvert non enregistré
+            ' 🛑 PAS DE SAVEAS ICI : Le document reste ouvert non enregistré
         End If
     Next i
 
-    ' WordApp.Visible = True déjà mis avant (Word restera ouvert)
+    ' WordApp.Visible = True déjà activé (Word reste ouvert)
     
-    MsgBox "Tous les documents sont créés et ouverts. À vous de les enregistrer."
+    MsgBox "Tous les documents Word sont créés et ouverts. Vous pouvez les enregistrer vous-même."
 End Sub
 
-' ➡️ Ajouter du texte avec style
-Sub AddText(ByRef WordDoc As Object, ByVal txt As String, ByVal styleName As String)
+' ➡️ Ajoute du texte avec style (tolérant si le style n'existe pas)
+Sub AddText(ByRef WordDoc As Object, ByVal txt As String, Optional ByVal styleName As String = "")
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
-        .Style = styleName
+        On Error Resume Next ' Ignore erreur de style
+        If styleName <> "" Then .Style = styleName
+        On Error GoTo 0 ' Revenir au comportement normal
     End With
     WordDoc.Content.Paragraphs.Add
 End Sub
 
-' ➡️ Ajouter une puce de liste
+' ➡️ Ajoute une puce de liste (tolérant si le style n'existe pas)
 Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
+        On Error Resume Next
         .Style = "List Paragraph"
         .ListFormat.ApplyBulletDefault
+        On Error GoTo 0
     End With
     WordDoc.Content.Paragraphs.Add
 End Sub
