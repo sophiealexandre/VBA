@@ -39,7 +39,7 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
             ' Créer un nouveau document Word
             Set WordDoc = WordApp.Documents.Add
 
-            ' Récupérer tous les éléments intéressants
+            ' Récupérer tous les éléments HTML
             Set objElements = objHtml.getElementsByTagName("*")
             
             TitleText = ""
@@ -67,7 +67,7 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
                     Case "br"
                         WordDoc.Content.InsertAfter vbCrLf
                     Case "ul"
-                        ' Rien ici, on gère juste à l'intérieur
+                        ' Rien ici, on gère les <li> à l'intérieur
                     Case "li"
                         If Trim(objElement.innerText) <> "" Then
                             AddBullet WordDoc, objElement.innerText
@@ -106,7 +106,7 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
     MsgBox "Export terminé dans : " & folderPath
 End Sub
 
-' Fonction pour ajouter du texte classique
+' Ajoute du texte avec le style donné
 Sub AddText(ByRef WordDoc As Object, ByVal txt As String, ByVal styleName As String)
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
@@ -115,7 +115,7 @@ Sub AddText(ByRef WordDoc As Object, ByVal txt As String, ByVal styleName As Str
     WordDoc.Content.Paragraphs.Add
 End Sub
 
-' Fonction pour ajouter un élément de liste à puces
+' Ajoute une puce de liste
 Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
@@ -125,16 +125,18 @@ Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     WordDoc.Content.Paragraphs.Add
 End Sub
 
-' Fonction pour nettoyer les noms de fichiers
+' Nettoie un titre pour créer un nom de fichier valide
 Function CleanFileName(ByVal FileName As String) As String
     Dim IllegalChars As Variant
     Dim i As Integer
 
     IllegalChars = Array("/", "\", ":", "*", "?", """", "<", ">", "|")
 
-    For i = LBound(IllegalChars) To UBound(IllegalChars)
-        FileName = Replace(FileName, IllegalChars(i), "")
-    Next i
+    If IsArray(IllegalChars) Then
+        For i = LBound(IllegalChars) To UBound(IllegalChars)
+            FileName = Replace(FileName, IllegalChars(i), "")
+        Next i
+    End If
 
     CleanFileName = Trim(FileName)
 End Function
