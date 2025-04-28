@@ -20,11 +20,11 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
     folderPath = ThisWorkbook.Path & "\Exports\"
     If Dir(folderPath, vbDirectory) = "" Then MkDir folderPath
 
-    ' Créer Word
+    ' Démarrer Word
     Set WordApp = CreateObject("Word.Application")
     WordApp.Visible = False ' Mets True si tu veux voir Word s'ouvrir
 
-    ' Boucler sur les 10 premières lignes
+    ' Boucle sur les 10 premières cellules de la colonne I
     For i = 1 To 10
         htmlText = ws.Cells(i, 9).Value ' Colonne I
         
@@ -89,7 +89,7 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
         End If
     Next i
 
-    ' Terminer Word
+    ' Fermer Word
     WordApp.Quit
 
     ' Nettoyer les objets
@@ -100,7 +100,7 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
     MsgBox "Export terminé dans : " & folderPath
 End Sub
 
-' Ajoute du texte avec style
+' ➡️ Ajoute du texte avec style
 Sub AddText(ByRef WordDoc As Object, ByVal txt As String, ByVal styleName As String)
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
@@ -109,7 +109,7 @@ Sub AddText(ByRef WordDoc As Object, ByVal txt As String, ByVal styleName As Str
     WordDoc.Content.Paragraphs.Add
 End Sub
 
-' Ajoute une puce de liste
+' ➡️ Ajoute une puce de liste
 Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
@@ -119,7 +119,7 @@ Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     WordDoc.Content.Paragraphs.Add
 End Sub
 
-' Nettoyer un nom de fichier
+' ➡️ Nettoyer le nom du fichier pour qu'il soit valide
 Function CleanFileName(ByVal FileName As String) As String
     Dim IllegalChars As Variant
     Dim i As Integer
