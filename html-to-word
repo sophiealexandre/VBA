@@ -22,9 +22,9 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
 
     ' Créer Word
     Set WordApp = CreateObject("Word.Application")
-    WordApp.Visible = False ' True si tu veux voir Word pendant l'exécution
+    WordApp.Visible = False ' Mets True si tu veux voir Word s'ouvrir
 
-    ' Boucle sur les 10 premières cellules de la colonne I
+    ' Boucler sur les 10 premières lignes
     For i = 1 To 10
         htmlText = ws.Cells(i, 9).Value ' Colonne I
         
@@ -38,7 +38,7 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
             ' Nouveau document Word
             Set WordDoc = WordApp.Documents.Add
 
-            ' Parcourir tous les éléments HTML
+            ' Récupérer tous les éléments HTML
             Set objElements = objHtml.getElementsByTagName("*")
             
             TitleText = ""
@@ -61,7 +61,7 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
                     Case "br"
                         WordDoc.Content.InsertAfter vbCrLf
                     Case "ul"
-                        ' On ne fait rien, on traite les <li>
+                        ' Rien ici
                     Case "li"
                         If Trim(objElement.innerText) <> "" Then
                             AddBullet WordDoc, objElement.innerText
@@ -69,11 +69,11 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
                 End Select
             Next objElement
 
-            ' S'il n'y a pas eu de H1
-            If TitleText = "" Then TitleText = "Sans_Titre_" & i
-
             ' Nettoyer pour créer le nom de fichier
+            TitleText = Trim(TitleText)
+            If TitleText = "" Then TitleText = "Sans_Titre_" & i
             cleanFileName = CleanFileName(TitleText)
+            If cleanFileName = "" Then cleanFileName = "Sans_Titre_" & i
 
             ' Protection contre doublons
             fNameTest = folderPath & cleanFileName & ".docx"
@@ -92,7 +92,7 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
     ' Terminer Word
     WordApp.Quit
 
-    ' Nettoyage mémoire
+    ' Nettoyer les objets
     Set WordDoc = Nothing
     Set WordApp = Nothing
     Set objHtml = Nothing
@@ -100,7 +100,7 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
     MsgBox "Export terminé dans : " & folderPath
 End Sub
 
-' Ajoute du texte formaté dans Word
+' Ajoute du texte avec style
 Sub AddText(ByRef WordDoc As Object, ByVal txt As String, ByVal styleName As String)
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
@@ -109,7 +109,7 @@ Sub AddText(ByRef WordDoc As Object, ByVal txt As String, ByVal styleName As Str
     WordDoc.Content.Paragraphs.Add
 End Sub
 
-' Ajoute une puce de liste dans Word
+' Ajoute une puce de liste
 Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
@@ -119,7 +119,7 @@ Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     WordDoc.Content.Paragraphs.Add
 End Sub
 
-' Nettoie le titre pour l'utiliser comme nom de fichier
+' Nettoyer un nom de fichier
 Function CleanFileName(ByVal FileName As String) As String
     Dim IllegalChars As Variant
     Dim i As Integer
