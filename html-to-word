@@ -1,4 +1,4 @@
-Sub ExportHTMLFromI_OpenOnly_FrenchStyle()
+Sub ExportHTMLFromI_OpenOnly_FrenchStyle_Save()
     Dim WordApp As Object
     Dim WordDoc As Object
     Dim ws As Worksheet
@@ -7,13 +7,19 @@ Sub ExportHTMLFromI_OpenOnly_FrenchStyle()
     Dim objHtml As Object
     Dim objElements As Object
     Dim objElement As Object
+    Dim folderPath As String
+    Dim fNameTest As String
 
     ' Définir la feuille active
     Set ws = ThisWorkbook.Sheets(1)
     
+    ' Définir le dossier Exports
+    folderPath = ThisWorkbook.Path & "\Exports\"
+    If Dir(folderPath, vbDirectory) = "" Then MkDir folderPath
+
     ' Démarrer Word
     Set WordApp = CreateObject("Word.Application")
-    WordApp.Visible = True ' Word sera visible
+    WordApp.Visible = False ' Word caché pendant la création
 
     ' Boucle sur les 10 premières lignes
     For i = 1 To 10
@@ -49,7 +55,7 @@ Sub ExportHTMLFromI_OpenOnly_FrenchStyle()
                         Case "br"
                             WordDoc.Content.InsertAfter vbCrLf
                         Case "ul"
-                            ' Rien ici
+                            ' Ne rien faire ici
                         Case "li"
                             If Trim(objElement.innerText) <> "" Then
                                 AddBullet WordDoc, objElement.innerText
@@ -58,16 +64,27 @@ Sub ExportHTMLFromI_OpenOnly_FrenchStyle()
                 Next objElement
             End If
 
-            ' 🛑 PAS DE SAVEAS ICI : Le document reste ouvert non enregistré
+            ' Définir le chemin de sauvegarde
+            fNameTest = folderPath & i & ".docx"
+            
+            ' Sauvegarder
+            WordDoc.SaveAs2 fNameTest
+            WordDoc.Close False
         End If
     Next i
 
-    ' WordApp.Visible = True déjà activé (Word reste ouvert)
-    
-    MsgBox "Tous les documents Word sont créés et ouverts. Vous pouvez les enregistrer vous-même."
+    ' Fermer Word
+    WordApp.Quit
+
+    ' Nettoyer
+    Set WordDoc = Nothing
+    Set WordApp = Nothing
+    Set objHtml = Nothing
+
+    MsgBox "Export terminé dans : " & folderPath
 End Sub
 
-' ➡️ Ajoute du texte avec style (en français)
+' ➡️ Ajouter du texte avec style français
 Sub AddText(ByRef WordDoc As Object, ByVal txt As String, Optional ByVal styleName As String = "")
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
@@ -78,12 +95,12 @@ Sub AddText(ByRef WordDoc As Object, ByVal txt As String, Optional ByVal styleNa
     WordDoc.Content.Paragraphs.Add
 End Sub
 
-' ➡️ Ajoute une puce de liste
+' ➡️ Ajouter une puce de liste
 Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
         On Error Resume Next
-        .Style = "Corps de texte" ' Pour éviter erreur, sinon List Paragraph n'existe pas en français
+        .Style = "Corps de texte"
         .ListFormat.ApplyBulletDefault
         On Error GoTo 0
     End With
