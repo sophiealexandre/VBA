@@ -24,7 +24,7 @@ Sub ExportHTMLFromI_NamedFromS()
     Set WordApp = CreateObject("Word.Application")
     WordApp.Visible = False
 
-    ' Boucle sur les 10 premières cellules
+    ' Boucle sur les 10 premières lignes
     For i = 1 To 10
         htmlText = ws.Cells(i, 9).Value ' Colonne I = contenu HTML
         fileNameText = ws.Cells(i, 19).Value ' Colonne S = nom du fichier
@@ -115,16 +115,17 @@ Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     WordDoc.Content.Paragraphs.Add
 End Sub
 
-' ➡️ Nettoyer le nom de fichier
+' ➡️ Nettoyer le nom de fichier SANS utiliser Array
 Function CleanFileName(ByVal FileName As String) As String
-    Dim IllegalChars As Variant
-    Dim i As Integer
-
-    IllegalChars = Array("/", "\", ":", "*", "?", """", "<", ">", "|")
-
-    For i = LBound(IllegalChars) To UBound(IllegalChars)
-        FileName = Replace(FileName, IllegalChars(i), "")
-    Next i
-
+    FileName = Replace(FileName, "/", "")
+    FileName = Replace(FileName, "\", "")
+    FileName = Replace(FileName, ":", "")
+    FileName = Replace(FileName, "*", "")
+    FileName = Replace(FileName, "?", "")
+    FileName = Replace(FileName, """", "")
+    FileName = Replace(FileName, "<", "")
+    FileName = Replace(FileName, ">", "")
+    FileName = Replace(FileName, "|", "")
+    
     CleanFileName = Trim(FileName)
 End Function
