@@ -1,4 +1,4 @@
-Sub ExportHTMLFromI_NamedSimpleNumber()
+Sub ExportHTMLFromI_OpenOnly()
     Dim WordApp As Object
     Dim WordDoc As Object
     Dim ws As Worksheet
@@ -7,19 +7,13 @@ Sub ExportHTMLFromI_NamedSimpleNumber()
     Dim objHtml As Object
     Dim objElements As Object
     Dim objElement As Object
-    Dim folderPath As String
-    Dim fNameTest As String
 
     ' Définir la feuille active
     Set ws = ThisWorkbook.Sheets(1)
     
-    ' Créer le dossier Exports si nécessaire
-    folderPath = ThisWorkbook.Path & "\Exports\"
-    If Dir(folderPath, vbDirectory) = "" Then MkDir folderPath
-
     ' Démarrer Word
     Set WordApp = CreateObject("Word.Application")
-    WordApp.Visible = False
+    WordApp.Visible = True ' Word est visible
 
     ' Boucle sur les 10 premières lignes
     For i = 1 To 10
@@ -55,7 +49,7 @@ Sub ExportHTMLFromI_NamedSimpleNumber()
                         Case "br"
                             WordDoc.Content.InsertAfter vbCrLf
                         Case "ul"
-                            ' Rien ici
+                            ' Ne rien faire ici
                         Case "li"
                             If Trim(objElement.innerText) <> "" Then
                                 AddBullet WordDoc, objElement.innerText
@@ -64,27 +58,16 @@ Sub ExportHTMLFromI_NamedSimpleNumber()
                 Next objElement
             End If
 
-            ' Définir un nom de fichier simple basé sur le numéro de ligne
-            fNameTest = folderPath & i & ".docx"
-
-            ' Sauvegarder
-            WordDoc.SaveAs fNameTest
-            WordDoc.Close False
+            ' 🛑 PAS DE SAVEAS ! Le document reste ouvert non enregistré
         End If
     Next i
 
-    ' Fermer Word
-    WordApp.Quit
-
-    ' Nettoyer
-    Set WordDoc = Nothing
-    Set WordApp = Nothing
-    Set objHtml = Nothing
-
-    MsgBox "Export terminé dans : " & folderPath
+    ' WordApp.Visible = True déjà mis avant (Word restera ouvert)
+    
+    MsgBox "Tous les documents sont créés et ouverts. À vous de les enregistrer."
 End Sub
 
-' ➡️ Ajoute du texte avec style
+' ➡️ Ajouter du texte avec style
 Sub AddText(ByRef WordDoc As Object, ByVal txt As String, ByVal styleName As String)
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
@@ -93,7 +76,7 @@ Sub AddText(ByRef WordDoc As Object, ByVal txt As String, ByVal styleName As Str
     WordDoc.Content.Paragraphs.Add
 End Sub
 
-' ➡️ Ajoute une puce de liste
+' ➡️ Ajouter une puce de liste
 Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
