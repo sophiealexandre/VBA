@@ -68,10 +68,21 @@ Sub ExportHTMLFromI_NamedFromS()
                 Next objElement
             End If
 
-            ' Nettoyer et sécuriser le nom de fichier
+            ' Nettoyer et sécuriser le nom de fichier directement
             fileNameText = Trim(fileNameText)
             If fileNameText = "" Then fileNameText = "Sans_Titre_" & i
-            cleanFileName = CleanFileName(fileNameText)
+
+            cleanFileName = fileNameText
+            cleanFileName = Replace(cleanFileName, "/", "")
+            cleanFileName = Replace(cleanFileName, "\", "")
+            cleanFileName = Replace(cleanFileName, ":", "")
+            cleanFileName = Replace(cleanFileName, "*", "")
+            cleanFileName = Replace(cleanFileName, "?", "")
+            cleanFileName = Replace(cleanFileName, """", "")
+            cleanFileName = Replace(cleanFileName, "<", "")
+            cleanFileName = Replace(cleanFileName, ">", "")
+            cleanFileName = Replace(cleanFileName, "|", "")
+            cleanFileName = Trim(cleanFileName)
             If cleanFileName = "" Then cleanFileName = "Sans_Titre_" & i
 
             ' Vérifier si le fichier existe déjà
@@ -117,18 +128,3 @@ Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     End With
     WordDoc.Content.Paragraphs.Add
 End Sub
-
-' ➡️ Nettoyer le nom du fichier sans utiliser Array
-Function CleanFileName(ByVal FileName As String) As String
-    FileName = Replace(FileName, "/", "")
-    FileName = Replace(FileName, "\", "")
-    FileName = Replace(FileName, ":", "")
-    FileName = Replace(FileName, "*", "")
-    FileName = Replace(FileName, "?", "")
-    FileName = Replace(FileName, """", "")
-    FileName = Replace(FileName, "<", "")
-    FileName = Replace(FileName, ">", "")
-    FileName = Replace(FileName, "|", "")
-    
-    CleanFileName = Trim(FileName)
-End Function
