@@ -1,4 +1,4 @@
-Sub ExportHTMLFromI_OpenOnly_NoStyleError()
+Sub ExportHTMLFromI_OpenOnly_FrenchStyle()
     Dim WordApp As Object
     Dim WordDoc As Object
     Dim ws As Worksheet
@@ -37,19 +37,19 @@ Sub ExportHTMLFromI_OpenOnly_NoStyleError()
                 For Each objElement In objElements
                     Select Case LCase(objElement.tagName)
                         Case "h1"
-                            AddText WordDoc, objElement.innerText, "Heading 1"
+                            AddText WordDoc, objElement.innerText, "Titre 1"
                         Case "h2"
-                            AddText WordDoc, objElement.innerText, "Heading 2"
+                            AddText WordDoc, objElement.innerText, "Titre 2"
                         Case "h3"
-                            AddText WordDoc, objElement.innerText, "Heading 3"
+                            AddText WordDoc, objElement.innerText, "Titre 3"
                         Case "p"
                             If Trim(objElement.innerText) <> "" Then
-                                AddText WordDoc, objElement.innerText, "Normal"
+                                AddText WordDoc, objElement.innerText, "Corps de texte"
                             End If
                         Case "br"
                             WordDoc.Content.InsertAfter vbCrLf
                         Case "ul"
-                            ' Ne rien faire
+                            ' Rien ici
                         Case "li"
                             If Trim(objElement.innerText) <> "" Then
                                 AddBullet WordDoc, objElement.innerText
@@ -67,23 +67,23 @@ Sub ExportHTMLFromI_OpenOnly_NoStyleError()
     MsgBox "Tous les documents Word sont créés et ouverts. Vous pouvez les enregistrer vous-même."
 End Sub
 
-' ➡️ Ajoute du texte avec style (tolérant si le style n'existe pas)
+' ➡️ Ajoute du texte avec style (en français)
 Sub AddText(ByRef WordDoc As Object, ByVal txt As String, Optional ByVal styleName As String = "")
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
-        On Error Resume Next ' Ignore erreur de style
+        On Error Resume Next
         If styleName <> "" Then .Style = styleName
-        On Error GoTo 0 ' Revenir au comportement normal
+        On Error GoTo 0
     End With
     WordDoc.Content.Paragraphs.Add
 End Sub
 
-' ➡️ Ajoute une puce de liste (tolérant si le style n'existe pas)
+' ➡️ Ajoute une puce de liste
 Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     With WordDoc.Content.Paragraphs.Last.Range
         .Text = txt
         On Error Resume Next
-        .Style = "List Paragraph"
+        .Style = "Corps de texte" ' Pour éviter erreur, sinon List Paragraph n'existe pas en français
         .ListFormat.ApplyBulletDefault
         On Error GoTo 0
     End With
