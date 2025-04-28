@@ -1,13 +1,13 @@
-Sub ExportHTMLWithParagraphsBreaksAndLists()
+Sub ExportHTMLFromI_NamedFromS()
     Dim WordApp As Object
     Dim WordDoc As Object
     Dim ws As Worksheet
     Dim i As Integer
     Dim htmlText As String
+    Dim fileNameText As String
     Dim objHtml As Object
     Dim objElements As Object
     Dim objElement As Object
-    Dim TitleText As String
     Dim folderPath As String
     Dim cleanFileName As String
     Dim fNameTest As String
@@ -22,11 +22,12 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
 
     ' Démarrer Word
     Set WordApp = CreateObject("Word.Application")
-    WordApp.Visible = False ' Mets True si tu veux voir Word s'ouvrir
+    WordApp.Visible = False
 
-    ' Boucle sur les 10 premières cellules de la colonne I
+    ' Boucle sur les 10 premières cellules
     For i = 1 To 10
-        htmlText = ws.Cells(i, 9).Value ' Colonne I
+        htmlText = ws.Cells(i, 9).Value ' Colonne I = contenu HTML
+        fileNameText = ws.Cells(i, 19).Value ' Colonne S = nom du fichier
         
         If Trim(htmlText) <> "" Then
             ' Charger le HTML
@@ -41,14 +42,9 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
             ' Récupérer tous les éléments HTML
             Set objElements = objHtml.getElementsByTagName("*")
             
-            TitleText = ""
-
             For Each objElement In objElements
                 Select Case LCase(objElement.tagName)
                     Case "h1"
-                        If TitleText = "" Then
-                            TitleText = objElement.innerText
-                        End If
                         AddText WordDoc, objElement.innerText, "Heading 1"
                     Case "h2"
                         AddText WordDoc, objElement.innerText, "Heading 2"
@@ -61,7 +57,7 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
                     Case "br"
                         WordDoc.Content.InsertAfter vbCrLf
                     Case "ul"
-                        ' Rien ici
+                        ' Ne rien faire ici
                     Case "li"
                         If Trim(objElement.innerText) <> "" Then
                             AddBullet WordDoc, objElement.innerText
@@ -69,13 +65,13 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
                 End Select
             Next objElement
 
-            ' Nettoyer pour créer le nom de fichier
-            TitleText = Trim(TitleText)
-            If TitleText = "" Then TitleText = "Sans_Titre_" & i
-            cleanFileName = CleanFileName(TitleText)
+            ' Nettoyer et sécuriser le nom de fichier
+            fileNameText = Trim(fileNameText)
+            If fileNameText = "" Then fileNameText = "Sans_Titre_" & i
+            cleanFileName = CleanFileName(fileNameText)
             If cleanFileName = "" Then cleanFileName = "Sans_Titre_" & i
 
-            ' Protection contre doublons
+            ' Vérifier si le fichier existe déjà
             fNameTest = folderPath & cleanFileName & ".docx"
             fileIndex = 1
             Do While Dir(fNameTest) <> ""
@@ -92,7 +88,7 @@ Sub ExportHTMLWithParagraphsBreaksAndLists()
     ' Fermer Word
     WordApp.Quit
 
-    ' Nettoyer les objets
+    ' Nettoyer
     Set WordDoc = Nothing
     Set WordApp = Nothing
     Set objHtml = Nothing
@@ -119,7 +115,7 @@ Sub AddBullet(ByRef WordDoc As Object, ByVal txt As String)
     WordDoc.Content.Paragraphs.Add
 End Sub
 
-' ➡️ Nettoyer le nom du fichier pour qu'il soit valide
+' ➡️ Nettoyer le nom de fichier
 Function CleanFileName(ByVal FileName As String) As String
     Dim IllegalChars As Variant
     Dim i As Integer
