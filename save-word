@@ -1,0 +1,8 @@
+Sub SaveAllDocuments()
+    Dim doc As Document
+    For Each doc In Application.Documents
+        If Not doc.ReadOnly Then
+            doc.Save
+        End If
+    Next doc
+End Sub
