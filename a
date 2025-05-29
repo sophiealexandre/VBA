@@ -1,0 +1,77 @@
+Sub ExportPage1ToPowerPoint()
+    Dim pptApp As Object
+    Dim pptPresentation As Object
+    Dim pptSlide As Object
+    Dim ws As Worksheet
+    Dim rng As Range
+    Dim pic As Object
+    Dim printArea As String
+    Dim slideIndex As Integer
+    Dim contentShape As Object
+
+    ' Ouvrir PowerPoint
+    On Error Resume Next
+    Set pptApp = GetObject(, "PowerPoint.Application")
+    If pptApp Is Nothing Then
+        Set pptApp = CreateObject("PowerPoint.Application")
+    End If
+    On Error GoTo 0
+
+    pptApp.Visible = True
+
+    ' Créer une nouvelle présentation
+    Set pptPresentation = pptApp.Presentations.Add
+
+    ' Boucler sur toutes les feuilles du classeur
+    slideIndex = 0
+    For Each ws In ThisWorkbook.Sheets
+        slideIndex = slideIndex + 1
+
+        ' Vérifier si une zone d'impression est définie
+        printArea = ws.PageSetup.PrintArea
+        If printArea <> "" Then
+            Set rng = ws.Range(printArea)
+        Else
+            Set rng = ws.UsedRange
+        End If
+        
+        ' Copier la capture d'écran avec meilleure qualité
+        rng.CopyPicture Appearance:=xlPrinter, Format:=xlBitmap
+
+        ' Ajouter une diapositive avec titre + contenu (code 11)
+        Set pptSlide = pptPresentation.Slides.Add(slideIndex, 11) ' 11 = ppLayoutTitleContent
+
+        ' Ajouter un titre avec le nom de la feuille
+        pptSlide.Shapes.Title.TextFrame.TextRange.Text = "Feuille : " & ws.Name & " - Page 1"
+
+        ' Trouver la zone de contenu
+        If pptSlide.Shapes.Count > 1 Then
+            Set contentShape = pptSlide.Shapes(2) ' Deuxième élément = zone de contenu
+        End If
+
+        ' Coller l'image
+        pptSlide.Shapes.Paste
+        Set pic = pptSlide.Shapes(pptSlide.Shapes.Count)
+
+        ' Ajuster la taille et la position de l'image dans la zone de contenu
+        If Not contentShape Is Nothing Then
+            pic.LockAspectRatio = msoTrue
+            pic.Width = contentShape.Width
+            pic.Height = contentShape.Height
+            pic.Top = contentShape.Top
+            pic.Left = contentShape.Left
+        Else
+            pic.Top = 100
+            pic.Left = 50
+            If pic.Width > 600 Then pic.Width = 600
+            If pic.Height > 400 Then pic.Height = 400
+        End If
+    Next ws
+
+    ' Nettoyage des objets
+    Set pptSlide = Nothing
+    Set pptPresentation = Nothing
+    Set pptApp = Nothing
+
+    MsgBox "PowerPoint généré avec succès avec les captures d'écran de la Page 1 dans le contenu des diapositives !", vbInformation
+End Sub
