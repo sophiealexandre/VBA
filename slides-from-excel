@@ -1,41 +1,64 @@
-Sub ExportPage1Feuille1VersPowerPoint()
+Sub CopierPremierePageImpressionFeuille1()
     Dim dossier As String
     Dim fichier As String
     Dim classeur As Workbook
     Dim feuille As Worksheet
-    Dim tempPDF As String
+    Dim plage As Range
     Dim pptApp As Object
     Dim pptPres As Object
     Dim pptSlide As Object
+    Dim hauteurMax As Double
+    Dim hauteurAcc As Double
+    Dim i As Long
 
-    ' 📁 Dossier contenant les fichiers Excel
-    dossier = "C:\Votre\Dossier\" ' ← Modifie ce chemin
+    ' 📁 Dossier à adapter
+    dossier = "C:\Votre\Dossier\" ' ← Modifier ici
     If Right(dossier, 1) <> "\" Then dossier = dossier & "\"
 
-    ' 🖼️ Créer PowerPoint
+    ' 📂 Ouvrir PowerPoint
     Set pptApp = CreateObject("PowerPoint.Application")
     pptApp.Visible = True
     Set pptPres = pptApp.Presentations.Add
 
-    ' 📂 Parcourir les fichiers Excel
     fichier = Dir(dossier & "*.xls*")
     Do While fichier <> ""
         Set classeur = Workbooks.Open(dossier & fichier, ReadOnly:=True)
-        Set feuille = classeur.Sheets(1) ' ← Seulement la première feuille
+        Set feuille = classeur.Sheets(1)
+        feuille.Activate
 
-        ' 📄 Exporter uniquement la première page d'impression en PDF
-        tempPDF = Environ$("TEMP") & "\page1.pdf"
-        feuille.ExportAsFixedFormat Type:=xlTypePDF, Filename:=tempPDF, From:=1, To:=1, OpenAfterPublish:=False
+        ' Estimation de la hauteur max d’une page imprimable (ajustable si besoin)
+        hauteurMax = feuille.PageSetup.PaperSize
+        If hauteurMax = xlPaperLetter Then
+            hauteurMax = 85 ' environ 85 points pour une page lettre
+        Else
+            hauteurMax = 85 ' valeur par défaut
+        End If
 
-        ' ➕ Créer une slide et insérer le PDF comme image
+        ' Sélection approximative des lignes tenant sur la première page
+        hauteurAcc = 0
+        For i = 1 To feuille.UsedRange.Rows.Count
+            hauteurAcc = hauteurAcc + feuille.Rows(i).RowHeight
+            If hauteurAcc > 800 Then Exit For ' ajustable pour affiner
+        Next i
+
+        ' Copier la plage de lignes qui "tient" en page 1
+        Set plage = feuille.Range("A1:Z" & i)
+        plage.CopyPicture Appearance:=xlScreen, Format:=xlPicture
+
+        ' Créer une slide et coller l'image
         Set pptSlide = pptPres.Slides.Add(pptPres.Slides.Count + 1, 12)
-        pptSlide.Shapes.AddPicture FileName:=tempPDF, _
-            LinkToFile:=msoFalse, SaveWithDocument:=msoTrue, _
-            Left:=20, Top:=20, Width:=-1, Height:=-1
+        pptSlide.Shapes.Paste.Select
+
+        ' Centrer l’image
+        With pptApp.ActiveWindow.Selection.ShapeRange
+            .LockAspectRatio = msoTrue
+            .Left = (pptPres.PageSetup.SlideWidth - .Width) / 2
+            .Top = (pptPres.PageSetup.SlideHeight - .Height) / 2
+        End With
 
         classeur.Close False
         fichier = Dir
     Loop
 
-    MsgBox "Slides générées avec la page 1 de chaque fichier Excel (feuille 1 uniquement)."
+    MsgBox "Slides créées avec la page 1 estimée de la feuille 1 de chaque fichier."
 End Sub
