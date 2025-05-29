@@ -7,7 +7,9 @@ Sub ExportPage1ToPowerPoint()
     Dim pic As Object
     Dim printArea As String
     Dim slideIndex As Integer
-    Dim contentShape As Object
+    Dim slideWidth As Single
+    Dim slideHeight As Single
+    Dim maxImageWidth As Single
 
     ' Ouvrir PowerPoint
     On Error Resume Next
@@ -21,6 +23,8 @@ Sub ExportPage1ToPowerPoint()
 
     ' Créer une nouvelle présentation
     Set pptPresentation = pptApp.Presentations.Add
+    slideWidth = pptPresentation.PageSetup.SlideWidth
+    slideHeight = pptPresentation.PageSetup.SlideHeight
 
     ' Boucler sur toutes les feuilles du classeur
     slideIndex = 0
@@ -35,43 +39,33 @@ Sub ExportPage1ToPowerPoint()
             Set rng = ws.UsedRange
         End If
         
-        ' Copier la capture d'écran de la plage
+        ' Copier la capture d'écran
         rng.CopyPicture Appearance:=xlScreen, Format:=xlPicture
 
-        ' Ajouter une diapositive avec titre + contenu (code 11)
-        Set pptSlide = pptPresentation.Slides.Add(slideIndex, 11) ' 11 = ppLayoutTitleContent
-
-        ' Ajouter un titre avec le nom de la feuille
+        ' Ajouter une diapositive avec titre + contenu (11 = ppLayoutTitleContent)
+        Set pptSlide = pptPresentation.Slides.Add(slideIndex, 11)
         pptSlide.Shapes.Title.TextFrame.TextRange.Text = "Feuille : " & ws.Name & " - Page 1"
-
-        ' Trouver la zone de contenu
-        If pptSlide.Shapes.Count > 1 Then
-            Set contentShape = pptSlide.Shapes(2) ' Deuxième élément = zone de contenu
-        End If
 
         ' Coller l'image
         pptSlide.Shapes.Paste
         Set pic = pptSlide.Shapes(pptSlide.Shapes.Count)
 
-        ' Ajuster la taille et la position de l'image dans la zone de contenu
-        If Not contentShape Is Nothing Then
-            pic.LockAspectRatio = msoTrue
-            pic.Width = contentShape.Width
-            pic.Height = contentShape.Height
-            pic.Top = contentShape.Top
-            pic.Left = contentShape.Left
-        Else
-            pic.Top = 100
-            pic.Left = 50
-            If pic.Width > 600 Then pic.Width = 600
-            If pic.Height > 400 Then pic.Height = 400
-        End If
+        ' Redimensionner l'image pour occuper toute la largeur (avec marges)
+        maxImageWidth = slideWidth - 80 ' marges gauche et droite (~40 pts de chaque côté)
+        pic.LockAspectRatio = msoTrue
+        pic.Width = maxImageWidth
+
+        ' Centrer horizontalement
+        pic.Left = (slideWidth - pic.Width) / 2
+
+        ' Position verticale : sous le titre (environ 80 pts)
+        pic.Top = 100
     Next ws
 
-    ' Nettoyage des objets
+    ' Nettoyage
     Set pptSlide = Nothing
     Set pptPresentation = Nothing
     Set pptApp = Nothing
 
-    MsgBox "PowerPoint généré avec succès avec les captures d'écran de la Page 1 dans le contenu des diapositives !", vbInformation
+    MsgBox "PowerPoint généré avec succès avec les images centrées et redimensionnées !", vbInformation
 End Sub
