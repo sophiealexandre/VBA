@@ -35,8 +35,8 @@ Sub ExportPage1ToPowerPoint()
             Set rng = ws.UsedRange
         End If
         
-        ' Copier la capture d'écran avec meilleure qualité
-        rng.CopyPicture Appearance:=xlPrinter, Format:=xlBitmap
+        ' Copier la capture d'écran de la plage
+        rng.CopyPicture Appearance:=xlScreen, Format:=xlPicture
 
         ' Ajouter une diapositive avec titre + contenu (code 11)
         Set pptSlide = pptPresentation.Slides.Add(slideIndex, 11) ' 11 = ppLayoutTitleContent
