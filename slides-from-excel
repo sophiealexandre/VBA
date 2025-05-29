@@ -1,18 +1,18 @@
-Sub ExporterPremierePageToutesFeuillesVersPPT()
+Sub ExporterPremierePageDeChaqueFeuille()
     Dim dossier As String
     Dim fichier As String
     Dim classeur As Workbook
     Dim feuille As Worksheet
-    Dim plagePage1 As Range
+    Dim plageTemp As Range
     Dim pptApp As Object
     Dim pptPres As Object
     Dim pptSlide As Object
 
-    ' 📁 À adapter : dossier contenant vos fichiers Excel
-    dossier = "C:\Votre\Dossier\" ' ← MODIFIER ICI
+    ' 📁 Dossier des fichiers Excel — MODIFIER ICI
+    dossier = "C:\Votre\Dossier\" ' ← Exemple : C:\Users\Utilisateur\Documents\
     If Right(dossier, 1) <> "\" Then dossier = dossier & "\"
 
-    ' 🖼️ Ouvrir PowerPoint
+    ' 🖼️ Créer une instance PowerPoint
     Set pptApp = CreateObject("PowerPoint.Application")
     pptApp.Visible = True
     Set pptPres = pptApp.Presentations.Add
@@ -22,37 +22,41 @@ Sub ExporterPremierePageToutesFeuillesVersPPT()
     Do While fichier <> ""
         Set classeur = Workbooks.Open(dossier & fichier)
 
-        ' 🔁 Pour chaque feuille du classeur
         For Each feuille In classeur.Sheets
             feuille.Activate
 
-            ' 📌 Obtenir la zone de la première page d'impression
-            On Error Resume Next
+            ' 🔍 Essayer d'utiliser la zone d’impression
             If feuille.PageSetup.PrintArea <> "" Then
-                Set plagePage1 = feuille.Range(feuille.PageSetup.PrintArea)
-            Else
-                Set plagePage1 = feuille.UsedRange
+                On Error Resume Next
+                Set plageTemp = feuille.Range(feuille.PageSetup.PrintArea)
+                On Error GoTo 0
             End If
-            On Error GoTo 0
 
-            ' Copier comme image
-            plagePage1.CopyPicture Appearance:=xlScreen, Format:=xlPicture
+            ' 🩹 Si pas de zone d’impression, on prend la plage visible de la première page
+            If plageTemp Is Nothing Then
+                Set plageTemp = feuille.Range("A1:G40") ' <- Ajustable selon vos cas
+            End If
 
-            ' Ajouter une nouvelle diapositive vide
-            Set pptSlide = pptPres.Slides.Add(pptPres.Slides.Count + 1, 12) ' 12 = slide vide
+            ' Copier en image
+            plageTemp.CopyPicture Appearance:=xlScreen, Format:=xlPicture
+
+            ' Ajouter une slide PowerPoint
+            Set pptSlide = pptPres.Slides.Add(pptPres.Slides.Count + 1, 12)
             pptSlide.Shapes.Paste.Select
 
-            ' Centrer l'image sur la diapositive
+            ' Centrer l'image
             With pptApp.ActiveWindow.Selection.ShapeRange
                 .LockAspectRatio = msoTrue
                 .Left = (pptPres.PageSetup.SlideWidth - .Width) / 2
                 .Top = (pptPres.PageSetup.SlideHeight - .Height) / 2
             End With
+
+            Set plageTemp = Nothing
         Next feuille
 
         classeur.Close False
         fichier = Dir
     Loop
 
-    MsgBox "Slides créées avec les premières pages d’impression de chaque feuille !"
+    MsgBox "Export terminé !"
 End Sub
