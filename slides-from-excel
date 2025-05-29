@@ -1,65 +1,53 @@
-Sub ExporterFeuille1CommeImageVersPowerPoint()
-    Dim PowerPointApp As Object
-    Dim Presentation As Object
-    Dim Slide As Object
-    Dim ExcelApp As Application
-    Dim Classeur As Workbook
-    Dim Feuille As Worksheet
-    Dim Plage As Range
-    Dim Fichier As String
-    Dim Dossier As String
+Sub ExporterPage1Feuille1VersPPT()
+    Dim dossier As String
+    Dim fichier As String
+    Dim classeur As Workbook
+    Dim feuille As Worksheet
+    Dim plage As Range
+    Dim imageTemp As String
+    Dim pptApp As Object
+    Dim pptPres As Object
+    Dim pptSlide As Object
 
-    ' 📁 Modifier ici
-    Dossier = "C:\Votre\Dossier\" ' ← Modifie ce chemin
-    If Right(Dossier, 1) <> "\" Then Dossier = Dossier & "\"
+    ' 📁 Dossier contenant les fichiers Excel
+    dossier = "C:\Votre\Dossier\" ' ← Modifiez ce chemin
+    If Right(dossier, 1) <> "\" Then dossier = dossier & "\"
 
-    ' Lancer PowerPoint
-    On Error Resume Next
-    Set PowerPointApp = GetObject(, "PowerPoint.Application")
-    If PowerPointApp Is Nothing Then
-        Set PowerPointApp = CreateObject("PowerPoint.Application")
-    End If
-    On Error GoTo 0
-    PowerPointApp.Visible = True
-    Set Presentation = PowerPointApp.Presentations.Add
+    ' 🖼️ Créer une instance PowerPoint
+    Set pptApp = CreateObject("PowerPoint.Application")
+    pptApp.Visible = True
+    Set pptPres = pptApp.Presentations.Add
 
-    ' Parcourir les fichiers Excel
-    Fichier = Dir(Dossier & "*.xls*")
-    Do While Fichier <> ""
-        Set Classeur = Workbooks.Open(Dossier & Fichier, ReadOnly:=True)
-        Set Feuille = Classeur.Sheets(1)
+    ' 📂 Parcourir les fichiers Excel
+    fichier = Dir(dossier & "*.xls*")
+    Do While fichier <> ""
+        Set classeur = Workbooks.Open(dossier & fichier, ReadOnly:=True)
+        Set feuille = classeur.Sheets(1)
 
         ' Définir la plage d'impression si elle est définie
-        If Feuille.PageSetup.PrintArea <> "" Then
-            Set Plage = Feuille.Range(Feuille.PageSetup.PrintArea)
+        If feuille.PageSetup.PrintArea <> "" Then
+            Set plage = feuille.Range(feuille.PageSetup.PrintArea)
         Else
-            Set Plage = Feuille.UsedRange
+            Set plage = feuille.UsedRange
         End If
 
         ' Copier la plage comme image
-        Plage.CopyPicture Appearance:=xlScreen, Format:=xlPicture
+        plage.CopyPicture Appearance:=xlScreen, Format:=xlPicture
 
         ' Créer une diapositive
-        Set Slide = Presentation.Slides.Add(Presentation.Slides.Count + 1, 12) ' 12 = slide vide
-        PowerPointApp.ActiveWindow.View.GotoSlide Slide.SlideIndex
+        Set pptSlide = pptPres.Slides.Add(pptPres.Slides.Count + 1, 12) ' 12 = slide vide
+        pptSlide.Shapes.Paste.Select
 
-        ' Coller dans la diapositive
-        On Error Resume Next
-        Slide.Shapes.Paste.Select
-        On Error GoTo 0
+        ' Centrer l'image
+        With pptApp.ActiveWindow.Selection.ShapeRange
+            .LockAspectRatio = msoTrue
+            .Left = (pptPres.PageSetup.SlideWidth - .Width) / 2
+            .Top = (pptPres.PageSetup.SlideHeight - .Height) / 2
+        End With
 
-        ' Centrer l'image si elle est collée
-        If PowerPointApp.ActiveWindow.Selection.Type = 2 Then
-            With PowerPointApp.ActiveWindow.Selection.ShapeRange
-                .LockAspectRatio = msoTrue
-                .Left = (Presentation.PageSetup.SlideWidth - .Width) / 2
-                .Top = (Presentation.PageSetup.SlideHeight - .Height) / 2
-            End With
-        End If
-
-        Classeur.Close SaveChanges:=False
-        Fichier = Dir
+        classeur.Close False
+        fichier = Dir
     Loop
 
-    MsgBox "Slides générées avec succès !"
+    MsgBox "Exportation terminée avec succès !"
 End Sub
