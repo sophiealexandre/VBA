@@ -60,11 +60,12 @@ Sub CopierBloc(sourceWs As Worksheet, startRow As Long, endRow As Long, index As
     Set newWs = Worksheets.Add(After:=Worksheets(Worksheets.Count))
     newWs.Name = newSheetName
 
-    ' Copier le bloc
+    ' Copier le bloc et défusionner les cellules
     Set rngToCopy = sourceWs.Rows(startRow & ":" & endRow)
     rngToCopy.Copy Destination:=newWs.Range("A1")
+    newWs.UsedRange.UnMerge
 
-    ' Identifier la colonne contenant "voyage"
+    ' Trouver la colonne contenant "voyage"
     voyageCol = 0
     For Each cell In newWs.Rows(1).Cells
         If LCase(cell.Value) Like "*voyage*" Then
@@ -84,27 +85,27 @@ Sub CopierBloc(sourceWs As Worksheet, startRow As Long, endRow As Long, index As
         Next c
     Next r
 
-    ' Mise en forme ligne 1 : en-tête bleu #0070C0 et texte blanc
+    ' Supprimer couleur de fond dans les 3 premières colonnes
+    For r = 1 To totalRows
+        For c = 1 To Application.Min(3, voyageCol - 1)
+            newWs.Cells(r, c).Interior.ColorIndex = xlNone
+        Next c
+    Next r
+
+    ' Mise en forme ligne 1 : en-tête bleu #0070C0 et texte blanc gras
     With newWs.Rows(1)
         .Font.Bold = True
         .Font.Color = RGB(255, 255, 255)
         .Interior.Color = RGB(0, 112, 192)
     End With
 
-    ' Zébrage à partir de la ligne 2
+    ' Zébrage des lignes 2+
     For r = 2 To totalRows
         If r Mod 2 = 0 Then
             newWs.Rows(r).Interior.Color = RGB(230, 230, 230)
         Else
             newWs.Rows(r).Interior.ColorIndex = xlNone
         End If
-    Next r
-
-    ' Nettoyer les 3 premières colonnes de tout remplissage (même sur ligne 1)
-    For r = 1 To totalRows
-        For c = 1 To Application.Min(3, voyageCol - 1)
-            newWs.Cells(r, c).Interior.ColorIndex = xlNone
-        Next c
     Next r
 
     newWs.Columns.AutoFit
