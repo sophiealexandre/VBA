@@ -1,0 +1,54 @@
+Sub ExtraireVoyage()
+    Dim ws As Worksheet, newWs As Worksheet
+    Dim cell As Range, c As Range
+    Dim matchRow As Range
+    Dim foundCount As Integer
+    Dim newSheetName As String
+    Dim i As Integer
+    
+    Application.ScreenUpdating = False
+    
+    ' Créer un nom unique pour la nouvelle feuille
+    newSheetName = "Voyage"
+    i = 1
+    Do While SheetExists(newSheetName)
+        i = i + 1
+        newSheetName = "Voyage (" & i & ")"
+    Loop
+    Set newWs = Worksheets.Add
+    newWs.Name = newSheetName
+    
+    foundCount = 0
+    
+    ' Parcourir chaque feuille sauf la nouvelle
+    For Each ws In Worksheets
+        If ws.Name <> newSheetName Then
+            For Each c In ws.UsedRange
+                If LCase(c.Value) Like "*voyage*" Then
+                    Set matchRow = c.EntireRow
+                    foundCount = foundCount + 1
+                    matchRow.Copy Destination:=newWs.Cells(foundCount, 1)
+                    Exit For ' on ne copie la ligne qu'une seule fois
+                End If
+            Next c
+        End If
+    Next ws
+
+    ' Mise en forme
+    With newWs.UsedRange
+        .Font.Bold = True
+        .Interior.Color = RGB(230, 240, 255)
+        .Columns.AutoFit
+    End With
+    
+    Application.ScreenUpdating = True
+    MsgBox foundCount & " ligne(s) contenant 'voyage' copiée(s) dans '" & newSheetName & "'.", vbInformation
+End Sub
+
+Function SheetExists(sheetName As String) As Boolean
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = Worksheets(sheetName)
+    SheetExists = Not ws Is Nothing
+    On Error GoTo 0
+End Function
