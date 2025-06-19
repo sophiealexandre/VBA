@@ -1,51 +1,70 @@
-Sub ExtraireVoyagesSeparés()
+Sub ExtraireBlocsVoyage()
     Dim ws As Worksheet, newWs As Worksheet
-    Dim cell As Range, c As Range
-    Dim i As Integer, nextRow As Long
+    Dim c As Range, r As Range
+    Dim lastRow As Long, startRow As Long, endRow As Long
+    Dim i As Integer
     Dim newSheetName As String
-    Dim found As Boolean
+    Dim blocEnCours As Boolean
     
     Application.ScreenUpdating = False
     i = 1
-    
-    ' Parcourir toutes les feuilles
+
     For Each ws In ThisWorkbook.Worksheets
-        For Each c In ws.UsedRange
-            If LCase(c.Value) Like "*voyage*" Then
-                ' Créer un nom unique pour la feuille
-                newSheetName = "Voyage"
-                If i > 1 Then newSheetName = newSheetName & " (" & i & ")"
-                Do While SheetExists(newSheetName)
-                    i = i + 1
-                    newSheetName = "Voyage (" & i & ")"
-                Loop
-                
-                ' Créer la nouvelle feuille
-                Set newWs = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
-                newWs.Name = newSheetName
-                
-                ' Copier la ligne contenant le mot "voyage"
-                c.EntireRow.Copy Destination:=newWs.Range("A1")
-                
-                ' Copier la ligne suivante si elle existe
-                On Error Resume Next
-                c.Offset(1, 0).EntireRow.Copy Destination:=newWs.Range("A2")
-                On Error GoTo 0
-                
-                ' Mise en forme
-                With newWs.UsedRange
-                    .Font.Bold = True
-                    .Interior.Color = RGB(230, 240, 255)
-                    .Columns.AutoFit
-                End With
-                
-                i = i + 1
-            End If
-        Next c
+        lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+        startRow = 0
+        blocEnCours = False
+        
+        For rowNum = 1 To lastRow
+            For Each c In ws.Rows(rowNum).Cells
+                If LCase(c.Value) Like "*voyage*" Then
+                    If blocEnCours Then
+                        endRow = rowNum - 1
+                        Call CopierBloc(ws, startRow, endRow, i)
+                        i = i + 1
+                    End If
+                    startRow = rowNum
+                    blocEnCours = True
+                    Exit For
+                End If
+            Next c
+        Next rowNum
+        
+        ' Traiter le dernier bloc si nécessaire
+        If blocEnCours Then
+            endRow = lastRow
+            Call CopierBloc(ws, startRow, endRow, i)
+            i = i + 1
+        End If
     Next ws
 
     Application.ScreenUpdating = True
-    MsgBox (i - 1) & " feuille(s) créées avec lignes contenant 'voyage'", vbInformation
+    MsgBox (i - 1) & " bloc(s) contenant 'voyage' exporté(s)", vbInformation
+End Sub
+
+Sub CopierBloc(sourceWs As Worksheet, startRow As Long, endRow As Long, index As Integer)
+    Dim newWs As Worksheet
+    Dim newSheetName As String
+    Dim rngToCopy As Range
+
+    newSheetName = "Voyage"
+    If index > 1 Then newSheetName = newSheetName & " (" & index & ")"
+    Do While SheetExists(newSheetName)
+        index = index + 1
+        newSheetName = "Voyage (" & index & ")"
+    Loop
+
+    Set newWs = Worksheets.Add(After:=Worksheets(Worksheets.Count))
+    newWs.Name = newSheetName
+
+    Set rngToCopy = sourceWs.Rows(startRow & ":" & endRow)
+    rngToCopy.Copy Destination:=newWs.Range("A1")
+
+    ' Mise en forme
+    With newWs.UsedRange
+        .Font.Bold = True
+        .Interior.Color = RGB(230, 240, 255)
+        .Columns.AutoFit
+    End With
 End Sub
 
 Function SheetExists(sheetName As String) As Boolean
