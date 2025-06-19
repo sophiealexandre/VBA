@@ -1,54 +1,55 @@
-Sub ExtraireVoyage()
+Sub ExtraireVoyagesSeparés()
     Dim ws As Worksheet, newWs As Worksheet
     Dim cell As Range, c As Range
-    Dim matchRow As Range
-    Dim foundCount As Integer
+    Dim i As Integer, nextRow As Long
     Dim newSheetName As String
-    Dim i As Integer
+    Dim found As Boolean
     
     Application.ScreenUpdating = False
-    
-    ' Créer un nom unique pour la nouvelle feuille
-    newSheetName = "Voyage"
     i = 1
-    Do While SheetExists(newSheetName)
-        i = i + 1
-        newSheetName = "Voyage (" & i & ")"
-    Loop
-    Set newWs = Worksheets.Add
-    newWs.Name = newSheetName
     
-    foundCount = 0
-    
-    ' Parcourir chaque feuille sauf la nouvelle
-    For Each ws In Worksheets
-        If ws.Name <> newSheetName Then
-            For Each c In ws.UsedRange
-                If LCase(c.Value) Like "*voyage*" Then
-                    Set matchRow = c.EntireRow
-                    foundCount = foundCount + 1
-                    matchRow.Copy Destination:=newWs.Cells(foundCount, 1)
-                    Exit For ' on ne copie la ligne qu'une seule fois
-                End If
-            Next c
-        End If
+    ' Parcourir toutes les feuilles
+    For Each ws In ThisWorkbook.Worksheets
+        For Each c In ws.UsedRange
+            If LCase(c.Value) Like "*voyage*" Then
+                ' Créer un nom unique pour la feuille
+                newSheetName = "Voyage"
+                If i > 1 Then newSheetName = newSheetName & " (" & i & ")"
+                Do While SheetExists(newSheetName)
+                    i = i + 1
+                    newSheetName = "Voyage (" & i & ")"
+                Loop
+                
+                ' Créer la nouvelle feuille
+                Set newWs = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+                newWs.Name = newSheetName
+                
+                ' Copier la ligne contenant le mot "voyage"
+                c.EntireRow.Copy Destination:=newWs.Range("A1")
+                
+                ' Copier la ligne suivante si elle existe
+                On Error Resume Next
+                c.Offset(1, 0).EntireRow.Copy Destination:=newWs.Range("A2")
+                On Error GoTo 0
+                
+                ' Mise en forme
+                With newWs.UsedRange
+                    .Font.Bold = True
+                    .Interior.Color = RGB(230, 240, 255)
+                    .Columns.AutoFit
+                End With
+                
+                i = i + 1
+            End If
+        Next c
     Next ws
 
-    ' Mise en forme
-    With newWs.UsedRange
-        .Font.Bold = True
-        .Interior.Color = RGB(230, 240, 255)
-        .Columns.AutoFit
-    End With
-    
     Application.ScreenUpdating = True
-    MsgBox foundCount & " ligne(s) contenant 'voyage' copiée(s) dans '" & newSheetName & "'.", vbInformation
+    MsgBox (i - 1) & " feuille(s) créées avec lignes contenant 'voyage'", vbInformation
 End Sub
 
 Function SheetExists(sheetName As String) As Boolean
-    Dim ws As Worksheet
     On Error Resume Next
-    Set ws = Worksheets(sheetName)
-    SheetExists = Not ws Is Nothing
+    SheetExists = Not Worksheets(sheetName) Is Nothing
     On Error GoTo 0
 End Function
