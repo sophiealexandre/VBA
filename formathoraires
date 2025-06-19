@@ -78,14 +78,7 @@ Sub CopierBloc(sourceWs As Worksheet, startRow As Long, endRow As Long, index As
     lastCol = newWs.Cells(1, newWs.Columns.Count).End(xlToLeft).Column
     Dim totalRows As Long: totalRows = endRow - startRow + 1
 
-    ' Vider contenu à gauche de "voyage" si dans les 3 premières colonnes
-    For r = 1 To totalRows
-        For c = 1 To Application.Min(3, voyageCol - 1)
-            newWs.Cells(r, c).ClearContents
-        Next c
-    Next r
-
-    ' Supprimer couleur de fond dans les 3 premières colonnes
+    ' Supprimer couleur de fond dans les 3 colonnes à gauche de "voyage"
     For r = 1 To totalRows
         For c = 1 To Application.Min(3, voyageCol - 1)
             newWs.Cells(r, c).Interior.ColorIndex = xlNone
@@ -109,6 +102,7 @@ Sub CopierBloc(sourceWs As Worksheet, startRow As Long, endRow As Long, index As
     Next r
 
     newWs.Columns.AutoFit
+    newWs.Rows.AutoFit
 End Sub
 
 Function SheetExists(sheetName As String) As Boolean
