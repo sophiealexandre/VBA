@@ -23,18 +23,15 @@ Sub ExtraireTousBlocsVoyage()
 
             If Not cell Is Nothing Then
                 If inBloc Then
-                    ' Fin du bloc précédent, copier de startRow à rowNum - 1
                     endRow = rowNum - 1
                     Call CopierBloc(ws, startRow, endRow, sheetCount)
                     sheetCount = sheetCount + 1
                 End If
-                ' Nouveau bloc commence ici
                 startRow = rowNum
                 inBloc = True
             End If
         Next rowNum
 
-        ' Fin de feuille : copier le dernier bloc si en cours
         If inBloc Then
             endRow = lastRow
             Call CopierBloc(ws, startRow, endRow, sheetCount)
@@ -50,11 +47,11 @@ Sub CopierBloc(sourceWs As Worksheet, startRow As Long, endRow As Long, index As
     Dim newWs As Worksheet
     Dim newSheetName As String
     Dim rngToCopy As Range
-    Dim col As Range, cell As Range
-    Dim lastCol As Long, i As Long
-    Dim horaireCols As Collection, arretCols As Collection
-    Dim isHoraire As Boolean, isArret As Boolean
-
+    Dim lastCol As Long
+    Dim r As Long, c As Long
+    Dim voyageCol As Long
+    Dim currentCell As Range
+    
     newSheetName = "Voyage"
     If index > 1 Then newSheetName = newSheetName & " (" & index & ")"
     Do While SheetExists(newSheetName)
@@ -68,45 +65,41 @@ Sub CopierBloc(sourceWs As Worksheet, startRow As Long, endRow As Long, index As
     Set rngToCopy = sourceWs.Rows(startRow & ":" & endRow)
     rngToCopy.Copy Destination:=newWs.Range("A1")
 
-    With newWs
-        .UsedRange.Font.Bold = True
-        .UsedRange.Interior.Color = RGB(230, 240, 255)
-        .UsedRange.Columns.AutoFit
-    End With
+    ' Trouver la colonne "voyage"
+    voyageCol = 0
+    For Each currentCell In newWs.Rows(1).Cells
+        If LCase(currentCell.Value) Like "*voyage*" Then
+            voyageCol = currentCell.Column
+            Exit For
+        End If
+    Next currentCell
 
-    ' Détection des colonnes "horaires" et "arrêts"
-    Set horaireCols = New Collection
-    Set arretCols = New Collection
+    If voyageCol = 0 Then Exit Sub ' sécurité
+
     lastCol = newWs.Cells(1, newWs.Columns.Count).End(xlToLeft).Column
 
-    For i = 1 To lastCol
-        isHoraire = False
-        isArret = False
-        For Each cell In newWs.Range(newWs.Cells(2, i), newWs.Cells(Application.WorksheetFunction.Min(10, endRow - startRow + 1), i))
-            If IsDate(cell.Value) Or InStr(LCase(cell.Value), "h") > 0 Then
-                isHoraire = True
-            ElseIf Not IsNumeric(cell.Value) And Not cell.Value Like "*[0-9]*" And Len(cell.Value) > 0 Then
-                isArret = True
-            End If
-        Next cell
-        If isHoraire Then horaireCols.Add i
-        If isArret Then arretCols.Add i
-    Next i
+    ' Vider les colonnes à gauche de "voyage"
+    For r = 1 To endRow - startRow + 1
+        For c = 1 To voyageCol - 1
+            newWs.Cells(r, c).Value = ""
+        Next c
+    Next r
 
-    ' Zébrage : une ligne sur deux, uniquement pour colonnes horaires ou arrêts
-    Dim rowMax As Long: rowMax = endRow - startRow + 1
-    Dim r As Long, c As Variant
+    ' Mise en forme
+    With newWs.Rows(1)
+        .Font.Bold = True
+        .Interior.Color = RGB(180, 210, 255) ' bleu moyen
+    End With
 
-    For r = 2 To rowMax
+    For r = 2 To endRow - startRow + 1
         If r Mod 2 = 0 Then
-            For Each c In horaireCols
-                newWs.Cells(r, c).Interior.Color = RGB(230, 230, 230)
-            Next c
-            For Each c In arretCols
-                newWs.Cells(r, c).Interior.Color = RGB(230, 230, 230)
-            Next c
+            newWs.Rows(r).Interior.Color = RGB(230, 230, 230) ' gris clair
+        Else
+            newWs.Rows(r).Interior.ColorIndex = xlNone ' blanc
         End If
     Next r
+
+    newWs.Columns.AutoFit
 End Sub
 
 Function SheetExists(sheetName As String) As Boolean
