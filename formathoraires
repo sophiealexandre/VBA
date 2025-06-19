@@ -1,24 +1,21 @@
 Sub ExtraireTousBlocsVoyage()
-    Dim ws As Worksheet, newWs As Worksheet
-    Dim i As Long, rowNum As Long, lastRow As Long
+    Dim ws As Worksheet, cell As Range
+    Dim rowNum As Long, lastRow As Long
     Dim startRow As Long, endRow As Long
     Dim inBloc As Boolean
     Dim sheetCount As Integer
-    Dim cell As Range
     
     Application.ScreenUpdating = False
     sheetCount = 1
 
     For Each ws In ThisWorkbook.Worksheets
         lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
-        startRow = 0
-        inBloc = False
+        startRow = 0: inBloc = False
 
         For rowNum = 1 To lastRow
             Set cell = Nothing
             On Error Resume Next
-            Set cell = ws.Rows(rowNum).Find(What:="voyage", LookIn:=xlValues, LookAt:=xlPart, _
-                                            SearchOrder:=xlByColumns, MatchCase:=False)
+            Set cell = ws.Rows(rowNum).Find("voyage", LookIn:=xlValues, LookAt:=xlPart, MatchCase:=False)
             On Error GoTo 0
 
             If Not cell Is Nothing Then
@@ -50,8 +47,9 @@ Sub CopierBloc(sourceWs As Worksheet, startRow As Long, endRow As Long, index As
     Dim lastCol As Long
     Dim r As Long, c As Long
     Dim voyageCol As Long
-    Dim currentCell As Range
-    
+    Dim cell As Range
+
+    ' Créer un nom d’onglet unique
     newSheetName = "Voyage"
     If index > 1 Then newSheetName = newSheetName & " (" & index & ")"
     Do While SheetExists(newSheetName)
@@ -62,41 +60,51 @@ Sub CopierBloc(sourceWs As Worksheet, startRow As Long, endRow As Long, index As
     Set newWs = Worksheets.Add(After:=Worksheets(Worksheets.Count))
     newWs.Name = newSheetName
 
+    ' Copier le bloc
     Set rngToCopy = sourceWs.Rows(startRow & ":" & endRow)
     rngToCopy.Copy Destination:=newWs.Range("A1")
 
-    ' Trouver la colonne "voyage"
+    ' Identifier la colonne contenant "voyage"
     voyageCol = 0
-    For Each currentCell In newWs.Rows(1).Cells
-        If LCase(currentCell.Value) Like "*voyage*" Then
-            voyageCol = currentCell.Column
+    For Each cell In newWs.Rows(1).Cells
+        If LCase(cell.Value) Like "*voyage*" Then
+            voyageCol = cell.Column
             Exit For
         End If
-    Next currentCell
-
-    If voyageCol = 0 Then Exit Sub ' sécurité
+    Next cell
+    If voyageCol = 0 Then Exit Sub
 
     lastCol = newWs.Cells(1, newWs.Columns.Count).End(xlToLeft).Column
+    Dim totalRows As Long: totalRows = endRow - startRow + 1
 
-    ' Vider les colonnes à gauche de "voyage"
-    For r = 1 To endRow - startRow + 1
-        For c = 1 To voyageCol - 1
-            newWs.Cells(r, c).Value = ""
+    ' Vider contenu à gauche de "voyage" si dans les 3 premières colonnes
+    For r = 1 To totalRows
+        For c = 1 To Application.Min(3, voyageCol - 1)
+            newWs.Cells(r, c).ClearContents
         Next c
     Next r
 
-    ' Mise en forme
+    ' Mise en forme ligne 1 : en-tête bleu #0070C0 et texte blanc
     With newWs.Rows(1)
         .Font.Bold = True
-        .Interior.Color = RGB(180, 210, 255) ' bleu moyen
+        .Font.Color = RGB(255, 255, 255)
+        .Interior.Color = RGB(0, 112, 192)
     End With
 
-    For r = 2 To endRow - startRow + 1
+    ' Zébrage à partir de la ligne 2
+    For r = 2 To totalRows
         If r Mod 2 = 0 Then
-            newWs.Rows(r).Interior.Color = RGB(230, 230, 230) ' gris clair
+            newWs.Rows(r).Interior.Color = RGB(230, 230, 230)
         Else
-            newWs.Rows(r).Interior.ColorIndex = xlNone ' blanc
+            newWs.Rows(r).Interior.ColorIndex = xlNone
         End If
+    Next r
+
+    ' Nettoyer les 3 premières colonnes de tout remplissage (même sur ligne 1)
+    For r = 1 To totalRows
+        For c = 1 To Application.Min(3, voyageCol - 1)
+            newWs.Cells(r, c).Interior.ColorIndex = xlNone
+        Next c
     Next r
 
     newWs.Columns.AutoFit
