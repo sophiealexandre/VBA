@@ -1,44 +1,50 @@
-Sub ExtraireBlocsVoyage()
+Sub ExtraireTousBlocsVoyage()
     Dim ws As Worksheet, newWs As Worksheet
-    Dim c As Range, r As Range
-    Dim lastRow As Long, startRow As Long, endRow As Long
-    Dim i As Integer
+    Dim i As Long, rowNum As Long, lastRow As Long
+    Dim startRow As Long, endRow As Long
+    Dim inBloc As Boolean
+    Dim sheetCount As Integer
     Dim newSheetName As String
-    Dim blocEnCours As Boolean
+    Dim rngToCopy As Range
+    Dim cell As Range
     
     Application.ScreenUpdating = False
-    i = 1
-
+    sheetCount = 1
+    
     For Each ws In ThisWorkbook.Worksheets
         lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
         startRow = 0
-        blocEnCours = False
+        inBloc = False
         
         For rowNum = 1 To lastRow
-            For Each c In ws.Rows(rowNum).Cells
-                If LCase(c.Value) Like "*voyage*" Then
-                    If blocEnCours Then
-                        endRow = rowNum - 1
-                        Call CopierBloc(ws, startRow, endRow, i)
-                        i = i + 1
-                    End If
-                    startRow = rowNum
-                    blocEnCours = True
-                    Exit For
+            Set cell = Nothing
+            On Error Resume Next
+            Set cell = ws.Rows(rowNum).Find(What:="voyage", LookIn:=xlValues, LookAt:=xlPart, SearchOrder:=xlByColumns, MatchCase:=False)
+            On Error GoTo 0
+            
+            If Not cell Is Nothing Then
+                If inBloc Then
+                    ' Fin du bloc précédent, copier de startRow à rowNum - 1
+                    endRow = rowNum - 1
+                    Call CopierBloc(ws, startRow, endRow, sheetCount)
+                    sheetCount = sheetCount + 1
                 End If
-            Next c
+                ' Nouveau bloc commence ici
+                startRow = rowNum
+                inBloc = True
+            End If
         Next rowNum
         
-        ' Traiter le dernier bloc si nécessaire
-        If blocEnCours Then
+        ' Fin de feuille : copier le dernier bloc si en cours
+        If inBloc Then
             endRow = lastRow
-            Call CopierBloc(ws, startRow, endRow, i)
-            i = i + 1
+            Call CopierBloc(ws, startRow, endRow, sheetCount)
+            sheetCount = sheetCount + 1
         End If
     Next ws
 
     Application.ScreenUpdating = True
-    MsgBox (i - 1) & " bloc(s) contenant 'voyage' exporté(s)", vbInformation
+    MsgBox (sheetCount - 1) & " onglet(s) créés pour les blocs contenant 'voyage'.", vbInformation
 End Sub
 
 Sub CopierBloc(sourceWs As Worksheet, startRow As Long, endRow As Long, index As Integer)
