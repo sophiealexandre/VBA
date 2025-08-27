@@ -1,0 +1,40 @@
+Option Explicit
+
+Sub StackAllSheets_Raw()
+    Dim ws As Worksheet, wsOut As Worksheet
+    Dim destRow As Long, lastRow As Long, lastCol As Long
+    Dim rng As Range, c As Range
+    Const OUT_NAME As String = "ToutesLesDonnees"
+
+    Application.ScreenUpdating = False
+    
+    ' Crée une feuille de sortie (à la fin)
+    Set wsOut = ThisWorkbook.Worksheets.Add(After:=Worksheets(Worksheets.Count))
+    wsOut.Name = OUT_NAME
+    
+    destRow = 1
+    
+    ' Boucle sur toutes les feuilles
+    For Each ws In ThisWorkbook.Worksheets
+        If ws.Name <> wsOut.Name Then
+            ' Dernière ligne et colonne utilisées
+            lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+            lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+            
+            ' Parcourt chaque cellule utilisée et copie en sortie
+            For Each rng In ws.Range(ws.Cells(1, 1), ws.Cells(lastRow, lastCol))
+                wsOut.Cells(destRow, 1).Value = ws.Name       ' Colonne A = nom de l'onglet
+                wsOut.Cells(destRow, 2).Value = rng.Address   ' Colonne B = adresse cellule (optionnel)
+                wsOut.Cells(destRow, 3).Value = rng.Value     ' Colonne C = valeur
+                destRow = destRow + 1
+            Next rng
+        End If
+    Next ws
+    
+    wsOut.Columns.AutoFit
+    wsOut.Activate
+    
+    Application.ScreenUpdating = True
+    
+    MsgBox "Stack terminé dans '" & OUT_NAME & "'.", vbInformation
+End Sub
