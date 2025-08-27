@@ -1,40 +1,68 @@
 Option Explicit
 
-Sub StackAllSheets_Raw()
+Sub StackAllSheets_AsPictures()
     Dim ws As Worksheet, wsOut As Worksheet
-    Dim destRow As Long, lastRow As Long, lastCol As Long
-    Dim rng As Range, c As Range
-    Const OUT_NAME As String = "ToutesLesDonnees"
-
-    Application.ScreenUpdating = False
+    Dim lastRow As Long, lastCol As Long, destRow As Long
+    Dim rngFound As Range, rngBlock As Range
+    Dim pic As Shape
+    Dim outName As String
     
-    ' Crée une feuille de sortie (à la fin)
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    
+    outName = "StackPics_" & Format(Now, "yyyymmdd_hhmmss")
     Set wsOut = ThisWorkbook.Worksheets.Add(After:=Worksheets(Worksheets.Count))
-    wsOut.Name = OUT_NAME
+    wsOut.Name = outName
     
     destRow = 1
     
-    ' Boucle sur toutes les feuilles
     For Each ws In ThisWorkbook.Worksheets
         If ws.Name <> wsOut.Name Then
-            ' Dernière ligne et colonne utilisées
-            lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
-            lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
             
-            ' Parcourt chaque cellule utilisée et copie en sortie
-            For Each rng In ws.Range(ws.Cells(1, 1), ws.Cells(lastRow, lastCol))
-                wsOut.Cells(destRow, 1).Value = ws.Name       ' Colonne A = nom de l'onglet
-                wsOut.Cells(destRow, 2).Value = rng.Address   ' Colonne B = adresse cellule (optionnel)
-                wsOut.Cells(destRow, 3).Value = rng.Value     ' Colonne C = valeur
+            Set rngFound = Nothing
+            On Error Resume Next
+            Set rngFound = ws.Cells.Find(What:="*", LookIn:=xlFormulas, _
+                                         SearchOrder:=xlByRows, SearchDirection:=xlPrevious)
+            On Error GoTo 0
+            
+            If Not rngFound Is Nothing Then
+                lastRow = rngFound.Row
+                lastCol = ws.Cells.Find(What:="*", LookIn:=xlFormulas, _
+                                        SearchOrder:=xlByColumns, SearchDirection:=xlPrevious).Column
+                Set rngBlock = ws.Range(ws.Cells(1, 1), ws.Cells(lastRow, lastCol))
+                
+                ' Titre
+                With wsOut.Cells(destRow, 1)
+                    .Value = ws.Name
+                    .Font.Bold = True
+                End With
                 destRow = destRow + 1
-            Next rng
+                
+                ' Copier en image (fidélité visuelle)
+                rngBlock.CopyPicture Appearance:=xlScreen, Format:=xlPicture
+                wsOut.Paste wsOut.Cells(destRow, 1)
+                
+                Set pic = wsOut.Shapes(wsOut.Shapes.Count)
+                ' Positionner précisément
+                pic.Top = wsOut.Cells(destRow, 1).Top
+                pic.Left = wsOut.Cells(destRow, 1).Left
+                
+                ' Avancer destRow sous l'image (en fonction de sa hauteur en points)
+                Dim hPts As Double, rowH As Double, rowsNeeded As Long
+                hPts = pic.Height
+                rowH = wsOut.Rows(destRow).RowHeight
+                If rowH = 0 Then rowH = 15
+                rowsNeeded = Application.WorksheetFunction.RoundUp(hPts / rowH, 0) + 2
+                destRow = destRow + rowsNeeded
+            End If
         End If
     Next ws
     
-    wsOut.Columns.AutoFit
     wsOut.Activate
+    wsOut.Cells(1, 1).Select
     
     Application.ScreenUpdating = True
+    Application.EnableEvents = True
     
-    MsgBox "Stack terminé dans '" & OUT_NAME & "'.", vbInformation
+    MsgBox "Empilement (images) terminé dans '" & wsOut.Name & "'.", vbInformation
 End Sub
