@@ -1,68 +1,51 @@
 Option Explicit
 
-Sub StackAllSheets_AsPictures()
+Sub StackAllSheets_AllContent()
     Dim ws As Worksheet, wsOut As Worksheet
     Dim lastRow As Long, lastCol As Long, destRow As Long
-    Dim rngFound As Range, rngBlock As Range
-    Dim pic As Shape
-    Dim outName As String
+    Dim rng As Range
     
     Application.ScreenUpdating = False
-    Application.EnableEvents = False
     
-    outName = "StackPics_" & Format(Now, "yyyymmdd_hhmmss")
+    ' Crée la feuille de sortie
     Set wsOut = ThisWorkbook.Worksheets.Add(After:=Worksheets(Worksheets.Count))
-    wsOut.Name = outName
+    wsOut.Name = "StackResult"
     
     destRow = 1
     
+    ' Boucle sur toutes les feuilles
     For Each ws In ThisWorkbook.Worksheets
         If ws.Name <> wsOut.Name Then
             
-            Set rngFound = Nothing
+            ' Détermine la zone utilisée
             On Error Resume Next
-            Set rngFound = ws.Cells.Find(What:="*", LookIn:=xlFormulas, _
-                                         SearchOrder:=xlByRows, SearchDirection:=xlPrevious)
+            lastRow = ws.Cells.Find("*", , , , xlByRows, xlPrevious).Row
+            lastCol = ws.Cells.Find("*", , , , xlByColumns, xlPrevious).Column
             On Error GoTo 0
             
-            If Not rngFound Is Nothing Then
-                lastRow = rngFound.Row
-                lastCol = ws.Cells.Find(What:="*", LookIn:=xlFormulas, _
-                                        SearchOrder:=xlByColumns, SearchDirection:=xlPrevious).Column
-                Set rngBlock = ws.Range(ws.Cells(1, 1), ws.Cells(lastRow, lastCol))
+            If lastRow > 0 And lastCol > 0 Then
+                Set rng = ws.Range(ws.Cells(1, 1), ws.Cells(lastRow, lastCol))
                 
-                ' Titre
-                With wsOut.Cells(destRow, 1)
-                    .Value = ws.Name
-                    .Font.Bold = True
-                End With
+                ' Ligne séparatrice = nom de la feuille
+                wsOut.Cells(destRow, 1).Value = ws.Name
+                wsOut.Cells(destRow, 1).Font.Bold = True
                 destRow = destRow + 1
                 
-                ' Copier en image (fidélité visuelle)
-                rngBlock.CopyPicture Appearance:=xlScreen, Format:=xlPicture
-                wsOut.Paste wsOut.Cells(destRow, 1)
+                ' Copie TOUT (valeurs + formats + bordures + fusions…)
+                rng.Copy
+                wsOut.Cells(destRow, 1).PasteSpecial Paste:=xlPasteAll
+                Application.CutCopyMode = False
                 
-                Set pic = wsOut.Shapes(wsOut.Shapes.Count)
-                ' Positionner précisément
-                pic.Top = wsOut.Cells(destRow, 1).Top
-                pic.Left = wsOut.Cells(destRow, 1).Left
-                
-                ' Avancer destRow sous l'image (en fonction de sa hauteur en points)
-                Dim hPts As Double, rowH As Double, rowsNeeded As Long
-                hPts = pic.Height
-                rowH = wsOut.Rows(destRow).RowHeight
-                If rowH = 0 Then rowH = 15
-                rowsNeeded = Application.WorksheetFunction.RoundUp(hPts / rowH, 0) + 2
-                destRow = destRow + rowsNeeded
+                ' Décale le point d’insertion sous le bloc copié
+                destRow = wsOut.Cells(wsOut.Rows.Count, 1).End(xlUp).Row + 2
             End If
         End If
     Next ws
     
+    wsOut.Columns.AutoFit
     wsOut.Activate
-    wsOut.Cells(1, 1).Select
     
     Application.ScreenUpdating = True
-    Application.EnableEvents = True
     
-    MsgBox "Empilement (images) terminé dans '" & wsOut.Name & "'.", vbInformation
+    MsgBox "Toutes les feuilles ont été empilées dans '" & wsOut.Name & "'.", vbInformation
 End Sub
