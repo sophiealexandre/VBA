@@ -1,57 +1,68 @@
 Option Explicit
 
-Sub StackAllSheets_WithTabNameInColA()
+Sub StackAllSheets_AllContent_WithTabInColA()
     Dim wb As Workbook: Set wb = ActiveWorkbook
     Dim ws As Worksheet, wsOut As Worksheet
     Dim destRow As Long, lastRow As Long, lastCol As Long
-    Dim rng As Range, arr As Variant
+    Dim rng As Range
     Dim outName As String
-    
+
     Application.ScreenUpdating = False
     Application.EnableEvents = False
     Application.Calculation = xlCalculationManual
-    
-    ' Créer une feuille de sortie avec un nom unique
+
+    ' Feuille de sortie (nom unique, aucune suppression)
     outName = UniqueSheetName(wb, "StackResult")
+    On Error GoTo AddErr
     Set wsOut = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
     wsOut.Name = outName
-    
+    On Error GoTo 0
+
     destRow = 1
-    
-    ' Parcourir toutes les feuilles
+
+    ' Boucle sur les feuilles du même classeur
     For Each ws In wb.Worksheets
         If ws.Name <> wsOut.Name Then
-            
-            ' Déterminer la zone utilisée
+            ' Zone utilisée
             On Error Resume Next
-            lastRow = ws.Cells.Find("*", , , , xlByRows, xlPrevious).Row
-            lastCol = ws.Cells.Find("*", , , , xlByColumns, xlPrevious).Column
+            lastRow = 0: lastCol = 0
+            lastRow = ws.Cells.Find(What:="*", LookIn:=xlFormulas, _
+                                    SearchOrder:=xlByRows, SearchDirection:=xlPrevious).Row
+            lastCol = ws.Cells.Find(What:="*", LookIn:=xlFormulas, _
+                                    SearchOrder:=xlByColumns, SearchDirection:=xlPrevious).Column
             On Error GoTo 0
-            
+
             If lastRow > 0 And lastCol > 0 Then
                 Set rng = ws.Range(ws.Cells(1, 1), ws.Cells(lastRow, lastCol))
-                
-                ' Charger le bloc de données dans un array
-                arr = rng.Value
-                
-                ' Écrire le nom de la feuille en colonne A, et les données à partir de B
-                wsOut.Cells(destRow, 1).Resize(UBound(arr, 1), 1).Value = ws.Name
-                wsOut.Cells(destRow, 2).Resize(UBound(arr, 1), UBound(arr, 2)).Value = arr
-                
-                ' Avancer la ligne d'insertion
-                destRow = destRow + UBound(arr, 1) + 1   ' +1 pour une ligne vide entre les blocs
+
+                ' 1) Colonne A : nom de l'onglet répété pour chaque ligne du bloc
+                wsOut.Cells(destRow, 1).Resize(lastRow, 1).Value = ws.Name
+
+                ' 2) Coller TOUT le bloc à partir de la colonne B (pour préserver sa mise en page interne)
+                rng.Copy
+                wsOut.Cells(destRow, 2).PasteSpecial Paste:=xlPasteAll
+                Application.CutCopyMode = False
+
+                ' 3) Ligne vide entre les blocs
+                destRow = Application.Max(destRow + lastRow, wsOut.Cells(wsOut.Rows.Count, 1).End(xlUp).Row) + 2
             End If
         End If
     Next ws
-    
+
     wsOut.Columns.AutoFit
     wsOut.Activate
-    
+
+CleanExit:
     Application.ScreenUpdating = True
     Application.EnableEvents = True
     Application.Calculation = xlCalculationAutomatic
-    
-    MsgBox "Empilement terminé dans '" & wsOut.Name & "'.", vbInformation
+    Exit Sub
+
+AddErr:
+    MsgBox "Impossible d'ajouter une feuille dans ce classeur." & vbCrLf & _
+           "Vérifiez que la structure du classeur n'est pas protégée " & _
+           "(Révision > Protéger le classeur).", vbExclamation, "Erreur 1004 - Sheets.Add"
+    Resume CleanExit
 End Sub
 
 ' Génère un nom de feuille unique sans supprimer
