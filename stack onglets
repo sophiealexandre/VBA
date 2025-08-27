@@ -1,51 +1,93 @@
 Option Explicit
 
-Sub StackAllSheets_AllContent()
+Sub StackAllSheets_AllContent_Fixed()
+    Dim wb As Workbook: Set wb = ActiveWorkbook   ' <— on cible le classeur ACTIF
     Dim ws As Worksheet, wsOut As Worksheet
-    Dim lastRow As Long, lastCol As Long, destRow As Long
+    Dim destRow As Long, lastRow As Long, lastCol As Long
     Dim rng As Range
-    
+    Dim outName As String
+
     Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.Calculation = xlCalculationManual
+
+    ' Feuille de sortie avec nom unique (aucune suppression)
+    outName = UniqueSheetName(wb, "StackResult")
     
-    ' Crée la feuille de sortie
-    Set wsOut = ThisWorkbook.Worksheets.Add(After:=Worksheets(Worksheets.Count))
-    wsOut.Name = "StackResult"
-    
+    ' Très important : qualifier le After avec le MÊME wb
+    On Error GoTo AddErr
+    Set wsOut = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
+    wsOut.Name = outName
+    On Error GoTo 0
+
     destRow = 1
-    
-    ' Boucle sur toutes les feuilles
-    For Each ws In ThisWorkbook.Worksheets
+
+    ' Boucle uniquement sur les feuilles du MÊME wb
+    For Each ws In wb.Worksheets
         If ws.Name <> wsOut.Name Then
-            
-            ' Détermine la zone utilisée
             On Error Resume Next
-            lastRow = ws.Cells.Find("*", , , , xlByRows, xlPrevious).Row
-            lastCol = ws.Cells.Find("*", , , , xlByColumns, xlPrevious).Column
+            lastRow = 0: lastCol = 0
+            lastRow = ws.Cells.Find(What:="*", LookIn:=xlFormulas, _
+                                     SearchOrder:=xlByRows, SearchDirection:=xlPrevious).Row
+            lastCol = ws.Cells.Find(What:="*", LookIn:=xlFormulas, _
+                                     SearchOrder:=xlByColumns, SearchDirection:=xlPrevious).Column
             On Error GoTo 0
-            
+
             If lastRow > 0 And lastCol > 0 Then
                 Set rng = ws.Range(ws.Cells(1, 1), ws.Cells(lastRow, lastCol))
-                
+
                 ' Ligne séparatrice = nom de la feuille
                 wsOut.Cells(destRow, 1).Value = ws.Name
                 wsOut.Cells(destRow, 1).Font.Bold = True
                 destRow = destRow + 1
-                
-                ' Copie TOUT (valeurs + formats + bordures + fusions…)
+
+                ' Colle TOUT (valeurs + formats + bordures + fusions…)
                 rng.Copy
                 wsOut.Cells(destRow, 1).PasteSpecial Paste:=xlPasteAll
                 Application.CutCopyMode = False
-                
-                ' Décale le point d’insertion sous le bloc copié
+
+                ' Prochaine zone dispo (+2 lignes d'espace)
                 destRow = wsOut.Cells(wsOut.Rows.Count, 1).End(xlUp).Row + 2
             End If
         End If
     Next ws
-    
+
     wsOut.Columns.AutoFit
     wsOut.Activate
-    
+
+CleanExit:
     Application.ScreenUpdating = True
-    
-    MsgBox "Toutes les feuilles ont été empilées dans '" & wsOut.Name & "'.", vbInformation
+    Application.EnableEvents = True
+    Application.Calculation = xlCalculationAutomatic
+    Exit Sub
+
+AddErr:
+    ' Causes fréquentes si ça échoue encore :
+    ' - Structure du classeur protégée (Révision > Protéger le classeur)
+    ' - Classeur partagé/protégé en écriture
+    MsgBox "Impossible d'ajouter une feuille dans ce classeur." & vbCrLf & _
+           "Vérifiez que la structure du classeur n'est pas protégée " & _
+           "(Onglet Révision > Protéger le classeur).", vbExclamation, "Erreur 1004 - Sheets.Add"
+    Resume CleanExit
 End Sub
+
+' Génère un nom de feuille unique sans supprimer de feuille existante
+Private Function UniqueSheetName(wb As Workbook, baseName As String) As String
+    Dim i As Long, candidate As String, exists As Boolean
+    Dim wsCheck As Worksheet
+    candidate = baseName: i = 1
+    Do
+        exists = False
+        For Each wsCheck In wb.Worksheets
+            If StrComp(wsCheck.Name, candidate, vbTextCompare) = 0 Then
+                exists = True: Exit For
+            End If
+        Next wsCheck
+        If Not exists Then
+            UniqueSheetName = candidate
+            Exit Function
+        End If
+        i = i + 1
+        candidate = baseName & " (" & i & ")"
+    Loop
+End Function
