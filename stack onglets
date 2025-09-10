@@ -1,140 +1,137 @@
 Option Explicit
 
-Sub StackAllSheets_AllContent_WithTabInColA_KeepFormatting()
-    Dim wb As Workbook: Set wb = ActiveWorkbook
-    Dim ws As Worksheet, wsOut As Worksheet
-    Dim destRow As Long, lastRow As Long, lastCol As Long
-    Dim rngBlock As Range
-    Dim outName As String
+Sub StackAllSheets_KeepEverything()
+    Const MASTER_NAME As String = "Stacked"
+    Dim wb As Workbook: Set wb = ThisWorkbook
+    Dim ws As Worksheet, wsMaster As Worksheet
+    Dim rng As Range, lastCell As Range
+    Dim pasteRow As Long, pasteCol As Long
+    Dim srcRows As Long, srcCols As Long
     Dim r As Long, c As Long
-    Dim rowsCount As Long, colsCount As Long
+    Dim srcColWidth As Double, tgtColWidth As Double
+    Dim srcRowHeight As Double, tgtRowHeight As Double
+    Dim includeHidden As Boolean
     
-    ' --- Réglages ---
-    Const ADD_BLANK_LINE_BETWEEN As Boolean = True
-    Const COPY_SHAPES_TOO As Boolean = False   ' Passez à True si vous voulez copier aussi images/graphes
+    ' === Paramètres ===
+    includeHidden = True  ' True = inclure aussi les onglets masqués (puisqu’on garde tout)
     
     Application.ScreenUpdating = False
     Application.EnableEvents = False
     Application.Calculation = xlCalculationManual
     
-    ' Créer la feuille de sortie (nom unique, aucune suppression)
-    outName = UniqueSheetName(wb, "StackResult")
-    On Error GoTo AddErr
-    Set wsOut = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
-    wsOut.Name = outName
+    ' === Obtenir/Créer la feuille MASTER en fin de classeur ===
+    On Error Resume Next
+    Set wsMaster = wb.Worksheets(MASTER_NAME)
     On Error GoTo 0
     
-    destRow = 1
+    If wsMaster Is Nothing Then
+        Set wsMaster = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
+        On Error Resume Next
+        wsMaster.Name = MASTER_NAME
+        If Err.Number <> 0 Then
+            Err.Clear
+            wsMaster.Name = MASTER_NAME & "_" & Format(Now, "yyyymmdd_hhnnss")
+        End If
+        On Error GoTo 0
+    Else
+        ' Vider totalement (contenu + formats + colonnes/lignes)
+        wsMaster.Cells.Clear
+        wsMaster.Cells.RowHeight = wsMaster.StandardHeight
+        wsMaster.Cells.ColumnWidth = wsMaster.StandardWidth
+    End If
     
+    ' On commence en ligne 1, colonne 2 (colonne 1 = nom d’onglet)
+    pasteRow = 1
+    pasteCol = 2
+    
+    ' Titre en ligne 1, col A
+    wsMaster.Cells(1, 1).Value = "Source_Sheet"
+    wsMaster.Cells(1, 1).Font.Bold = True
+    
+    ' === Boucle sur toutes les feuilles ===
     For Each ws In wb.Worksheets
-        If ws.Name <> wsOut.Name Then
-            
-            ' Détecter la zone réellement utilisée
-            On Error Resume Next
-            lastRow = 0: lastCol = 0
-            lastRow = ws.Cells.Find(What:="*", LookIn:=xlFormulas, _
-                                    SearchOrder:=xlByRows, SearchDirection:=xlPrevious).Row
-            lastCol = ws.Cells.Find(What:="*", LookIn:=xlFormulas, _
-                                    SearchOrder:=xlByColumns, SearchDirection:=xlPrevious).Column
-            On Error GoTo 0
-            
-            If lastRow > 0 And lastCol > 0 Then
-                Set rngBlock = ws.Range(ws.Cells(1, 1), ws.Cells(lastRow, lastCol))
-                rowsCount = rngBlock.Rows.Count
-                colsCount = rngBlock.Columns.Count
-                
-                ' 1) Colonne A : nom d’onglet répété pour chaque ligne du bloc
-                wsOut.Cells(destRow, 1).Resize(rowsCount, 1).Value = ws.Name
-                
-                ' 2) Coller TOUT le bloc (valeurs + formats + bordures + fusions + MFC) à partir de la colonne B
-                rngBlock.Copy
-                wsOut.Cells(destRow, 2).PasteSpecial Paste:=xlPasteAll
-                ' 2bis) Reprendre les largeurs de colonnes de la source
-                wsOut.Cells(destRow, 2).PasteSpecial Paste:=xlPasteColumnWidths
-                Application.CutCopyMode = False
-                
-                ' 3) Reprendre les hauteurs de lignes du bloc
-                For r = 1 To rowsCount
-                    wsOut.Rows(destRow + r - 1).RowHeight = ws.Rows(r).RowHeight
-                Next r
-                
-                ' 4) (Optionnel) Copier aussi les objets/graphes/images au bon offset
-                If COPY_SHAPES_TOO Then
-                    Dim shp As Shape, pasted As Shape
-                    Dim topOffset As Double, leftOffset As Double
-                    topOffset = wsOut.Cells(destRow, 2).Top - ws.Cells(1, 1).Top
-                    leftOffset = wsOut.Cells(destRow, 2).Left - ws.Cells(1, 1).Left
+        If ws.Name <> wsMaster.Name Then
+            If includeHidden Or ws.Visible = xlSheetVisible Then
+                ' Détecter la zone à copier (UsedRange peut contenir des scories; on fiabilise)
+                If WorksheetHasData(ws) Then
+                    ' Dernière cellule réellement utilisée
+                    Set lastCell = ws.Cells.SpecialCells(xlCellTypeLastCell)
+                    srcRows = lastCell.Row
+                    srcCols = lastCell.Column
+                    Set rng = ws.Range(ws.Cells(1, 1), ws.Cells(srcRows, srcCols))
                     
-                    For Each shp In ws.Shapes
-                        If IntersectsShapeRange(shp, rngBlock) Then
-                            shp.Copy
-                            wsOut.Paste
-                            Set pasted = wsOut.Shapes(wsOut.Shapes.Count)
-                            pasted.Top = shp.Top + topOffset
-                            pasted.Left = shp.Left + leftOffset
-                            On Error Resume Next
-                            pasted.Placement = shp.Placement
-                            pasted.LockAspectRatio = shp.LockAspectRatio
-                            On Error GoTo 0
+                    ' Coller un en-tête de bloc (nom d’onglet) si on n’est pas en tout début
+                    If pasteRow > 1 Then
+                        pasteRow = pasteRow + 1   ' ligne vide séparatrice
+                    End If
+                    
+                    ' 1) Coller le contenu & formats COMPLETS
+                    rng.Copy
+                    wsMaster.Cells(pasteRow, pasteCol).PasteSpecial Paste:=xlPasteAll
+                    Application.CutCopyMode = False
+                    
+                    ' 2) Reporter le nom de la feuille dans la colonne A pour toutes les lignes du bloc
+                    wsMaster.Range(wsMaster.Cells(pasteRow, 1), _
+                                   wsMaster.Cells(pasteRow + srcRows - 1, 1)).Value = ws.Name
+                    
+                    ' 3) Harmoniser les LARGEURS DE COLONNES (max entre existant et source)
+                    For c = 1 To srcCols
+                        srcColWidth = ws.Columns(c).ColumnWidth
+                        tgtColWidth = wsMaster.Columns(pasteCol + c - 1).ColumnWidth
+                        If srcColWidth > tgtColWidth Then
+                            wsMaster.Columns(pasteCol + c - 1).ColumnWidth = srcColWidth
                         End If
-                    Next shp
-                End If
-                
-                ' 5) Avancer la position d’insertion sous le bloc
-                If ADD_BLANK_LINE_BETWEEN Then
-                    destRow = destRow + rowsCount + 1
-                Else
-                    destRow = destRow + rowsCount
+                    Next c
+                    
+                    ' 4) Harmoniser les HAUTEURS DE LIGNES (max entre existant et source)
+                    For r = 1 To srcRows
+                        srcRowHeight = ws.Rows(r).RowHeight
+                        tgtRowHeight = wsMaster.Rows(pasteRow + r - 1).RowHeight
+                        If srcRowHeight > tgtRowHeight Then
+                            wsMaster.Rows(pasteRow + r - 1).RowHeight = srcRowHeight
+                        End If
+                    Next r
+                    
+                    ' 5) Optionnel : reproduire les largeurs de colonnes de la colonne A (étiquette)
+                    ' Garder une largeur raisonnable pour le nom de feuille
+                    If wsMaster.Columns(1).ColumnWidth < 20 Then
+                        wsMaster.Columns(1).ColumnWidth = 20
+                    End If
+                    
+                    ' Avancer le curseur de collage (prochaine ligne après le bloc)
+                    pasteRow = pasteRow + srcRows
                 End If
             End If
         End If
     Next ws
     
-    wsOut.Activate
+    ' Geler la 1re ligne (étiquette "Source_Sheet")
+    With wsMaster
+        .Rows(1).Font.Bold = True
+        .Activate
+        .Range("B2").Select
+        ActiveWindow.FreezePanes = False
+        .Range("B2").Select
+        ActiveWindow.FreezePanes = True
+        .Range("A1").Select
+    End With
     
-CleanExit:
-    Application.ScreenUpdating = True
-    Application.EnableEvents = True
     Application.Calculation = xlCalculationAutomatic
-    Exit Sub
-
-AddErr:
-    MsgBox "Impossible d'ajouter une feuille dans ce classeur." & vbCrLf & _
-           "Vérifiez que la structure du classeur n'est pas protégée " & _
-           "(Révision > Protéger le classeur).", vbExclamation, "Erreur 1004 - Sheets.Add"
-    Resume CleanExit
+    Application.EnableEvents = True
+    Application.ScreenUpdating = True
+    
+    MsgBox "Empilage terminé dans '" & wsMaster.Name & "'. Tout a été conservé.", vbInformation
 End Sub
 
-' Nom de feuille unique (sans supprimer les existantes)
-Private Function UniqueSheetName(wb As Workbook, baseName As String) As String
-    Dim i As Long, candidate As String, exists As Boolean
-    Dim wsCheck As Worksheet
-    candidate = baseName: i = 1
-    Do
-        exists = False
-        For Each wsCheck In wb.Worksheets
-            If StrComp(wsCheck.Name, candidate, vbTextCompare) = 0 Then
-                exists = True: Exit For
-            End If
-        Next wsCheck
-        If Not exists Then
-            UniqueSheetName = candidate
-            Exit Function
-        End If
-        i = i + 1
-        candidate = baseName & " (" & i & ")"
-    Loop
-End Function
-
-' Détermine si une shape chevauche la plage (utile pour COPY_SHAPES_TOO)
-Private Function IntersectsShapeRange(ByVal shp As Shape, ByVal rng As Range) As Boolean
-    Dim sTop As Double, sLeft As Double, sBottom As Double, sRight As Double
-    Dim rTop As Double, rLeft As Double, rBottom As Double, rRight As Double
-    sTop = shp.Top: sLeft = shp.Left
-    sBottom = shp.Top + shp.Height
-    sRight = shp.Left + shp.Width
-    rTop = rng.Top: rLeft = rng.Left
-    rBottom = rng.Top + rng.Height
-    rRight = rng.Left + rng.Width
-    IntersectsShapeRange = Not (sRight < rLeft Or sLeft > rRight Or sBottom < rTop Or sTop > rBottom)
+Private Function WorksheetHasData(sh As Worksheet) As Boolean
+    ' Vérifie s’il y a au moins une cellule non vide dans la feuille
+    Dim lastCell As Range
+    On Error Resume Next
+    Set lastCell = sh.Cells.SpecialCells(xlCellTypeLastCell)
+    On Error GoTo 0
+    If lastCell Is Nothing Then
+        WorksheetHasData = False
+    Else
+        WorksheetHasData = Application.WorksheetFunction.CountA(sh.Range(sh.Cells(1, 1), lastCell)) > 0
+    End If
 End Function
