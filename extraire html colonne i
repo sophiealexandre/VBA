@@ -1,0 +1,170 @@
+Option Explicit
+
+Sub ExporterHtmlColonneIEnWord_331()
+
+    Const COL_HTML As String = "I"  ' Colonne contenant le HTML
+    Const COL_NOM As String = "A"   ' Colonne pour nommer les fichiers
+    Const START_ROW As Long = 2     ' On commence à la ligne 2 (entêtes en ligne 1)
+    
+    Dim ws As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim htmlText As String
+    Dim dossierSortie As String
+    Dim tempDossier As String
+    Dim tempFichier As String
+    Dim nomDoc As String
+    Dim baseName As String
+    
+    Dim wdApp As Object ' Word.Application
+    Dim wdDoc As Object ' Word.Document
+    Dim wordDejaOuvert As Boolean
+    Const wdFormatXMLDocument As Long = 12 ' .docx
+    
+    Dim calcMode As Long
+    
+    On Error GoTo ErrHandler
+    
+    Set ws = ActiveSheet
+    
+    ' Dernière ligne non vide de la colonne HTML
+    lastRow = ws.Cells(ws.Rows.Count, COL_HTML).End(xlUp).Row
+    If lastRow < START_ROW Then
+        MsgBox "Aucune donnée trouvée dans la colonne " & COL_HTML & ".", vbInformation
+        GoTo Nettoyage
+    End If
+    
+    ' Pour votre cas : on ne dépassera pas 331
+    If lastRow > 331 Then lastRow = 331
+    
+    ' Choisir le dossier de sortie
+    With Application.FileDialog(msoFileDialogFolderPicker)
+        .Title = "Choisissez le dossier où sauvegarder les fichiers Word"
+        If .Show <> -1 Then
+            MsgBox "Opération annulée.", vbInformation
+            GoTo Nettoyage
+        End If
+        dossierSortie = .SelectedItems(1)
+    End With
+    
+    If Right(dossierSortie, 1) <> "\" Then
+        dossierSortie = dossierSortie & "\"
+    End If
+    
+    ' Dossier temporaire Windows
+    tempDossier = Environ$("TEMP")
+    If Right(tempDossier, 1) <> "\" Then
+        tempDossier = tempDossier & "\"
+    End If
+    
+    ' Allèger Excel pendant l'exécution
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    calcMode = Application.Calculation
+    Application.Calculation = xlCalculationManual
+    Application.StatusBar = "Export HTML -> Word en cours..."
+    
+    ' Essayer de récupérer une instance de Word si déjà ouverte
+    On Error Resume Next
+    Set wdApp = GetObject(, "Word.Application")
+    On Error GoTo ErrHandler
+    
+    If wdApp Is Nothing Then
+        Set wdApp = CreateObject("Word.Application")
+        wordDejaOuvert = False
+    Else
+        wordDejaOuvert = True
+    End If
+    
+    wdApp.Visible = False ' Word reste caché
+    
+    ' Boucle sur chaque ligne
+    For i = START_ROW To lastRow
+        
+        htmlText = CStr(ws.Cells(i, COL_HTML).Value)
+        
+        ' Ignorer les cellules vides
+        If Len(Trim$(htmlText)) > 0 Then
+            
+            ' Déterminer le nom de base du fichier via la colonne A
+            baseName = CStr(ws.Cells(i, COL_NOM).Value)
+            If Len(Trim$(baseName)) = 0 Then
+                baseName = "Ligne_" & i
+            End If
+            baseName = CleanFileName(baseName)
+            If baseName = "" Then
+                baseName = "Ligne_" & i
+            End If
+            
+            ' Créer un fichier .html temporaire
+            tempFichier = tempDossier & "TempHTML_Ligne" & i & ".html"
+            
+            Dim fNum As Integer
+            fNum = FreeFile
+            Open tempFichier For Output As #fNum
+            Print #fNum, htmlText
+            Close #fNum
+            
+            ' Ouvrir le fichier HTML dans Word
+            Set wdDoc = wdApp.Documents.Open(FileName:=tempFichier, ReadOnly:=True)
+            
+            ' Enregistrer en .docx
+            nomDoc = dossierSortie & baseName & ".docx"
+            wdDoc.SaveAs2 FileName:=nomDoc, FileFormat:=wdFormatXMLDocument
+            wdDoc.Close SaveChanges:=False
+            
+            ' Supprimer le fichier temporaire
+            On Error Resume Next
+            Kill tempFichier
+            On Error GoTo ErrHandler
+            
+        End If
+        
+        ' Laisser respirer Excel/Word pour ne pas geler
+        If i Mod 20 = 0 Then
+            DoEvents
+            Application.StatusBar = "Export en cours... Ligne " & i & " sur " & lastRow
+        End If
+        
+    Next i
+    
+    MsgBox "Export terminé : " & (lastRow - START_ROW + 1) & " lignes traitées." & vbCrLf & _
+           "Les fichiers Word sont dans :" & vbCrLf & dossierSortie, vbInformation
+
+Nettoyage:
+    On Error Resume Next
+    Application.ScreenUpdating = True
+    Application.EnableEvents = True
+    Application.Calculation = calcMode
+    Application.StatusBar = False
+    
+    If Not wdApp Is Nothing Then
+        If wordDejaOuvert = False Then
+            wdApp.Quit SaveChanges:=False
+        End If
+    End If
+    
+    Set wdDoc = Nothing
+    Set wdApp = Nothing
+    Set ws = Nothing
+    
+    Exit Sub
+
+ErrHandler:
+    MsgBox "Erreur : " & Err.Number & " - " & Err.Description, vbCritical
+    Resume Nettoyage
+
+End Sub
+
+Private Function CleanFileName(ByVal s As String) As String
+    Dim badChars As Variant
+    Dim c As Variant
+    
+    badChars = Array("\", "/", ":", "*", "?", """", "<", ">", "|")
+    
+    For Each c In badChars
+        s = Replace(s, c, "_")
+    Next c
+    
+    s = Trim$(s)
+    CleanFileName = s
+End Function
