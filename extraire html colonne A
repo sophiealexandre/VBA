@@ -1,11 +1,14 @@
 Option Explicit
 
-Sub Test_CreationDocsWord()
+Sub ExporterUrlsVersWord()
     Dim ws As Worksheet
     Dim lastRow As Long, i As Long
     Dim url As String
-    Dim wdApp As Object
-    Dim wdDoc As Object
+    Dim htmlText As String
+    Dim htmlDoc As Object        ' HTMLDocument
+    Dim mainNode As Object       ' Element principal de contenu
+    Dim wdApp As Object          ' Word.Application
+    Dim wdDoc As Object          ' Word.Document
     
     Set ws = ActiveSheet
     lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
@@ -19,20 +22,262 @@ Sub Test_CreationDocsWord()
     End If
     wdApp.Visible = True
     
-    ' 🔹 BOUCLE SUR TOUTES LES LIGNES AVEC CONTENU EN COLONNE A
+    ' 🔹 BOUCLE SUR TOUTES LES LIGNES DE LA COLONNE A
     For i = 1 To lastRow
-        url = Trim$(ws.Cells(i, "A").Value)
         
+        url = Trim$(ws.Cells(i, "A").Value)
         If url <> "" Then
-            ' ➜ Ici on crée 1 document par URL, sans HTML, juste pour tester
+            
+            ' ➜ Créer le document Word DÈS MAINTENANT
             Set wdDoc = wdApp.Documents.Add
             
-            With wdDoc.Range
-                .Text = "Test document pour la ligne " & i & vbCrLf & _
-                        "URL en colonne A : " & url
-            End With
+            ' Récupération HTML
+            htmlText = GetHtmlFromUrl(url)
+            
+            If htmlText = "" Then
+                ' Si rien récupéré, on met au moins l’info dans le doc
+                With wdDoc.Range
+                    .Text = "URL : " & url & vbCrLf & _
+                            "[Aucun contenu HTML récupéré pour cette page]" & vbCrLf
+                End With
+            Else
+                ' Charger le HTML dans MSHTML
+                Set htmlDoc = CreateObject("HTMLFile")
+                htmlDoc.Open
+                htmlDoc.Write htmlText
+                htmlDoc.Close
+                
+                ' Trouver la zone principale
+                Set mainNode = GetMainContentNode(htmlDoc)
+                If mainNode Is Nothing Then
+                    On Error Resume Next
+                    Set mainNode = htmlDoc.getElementsByTagName("body")(0)
+                    On Error GoTo 0
+                End If
+                
+                If mainNode Is Nothing Then
+                    With wdDoc.Range
+                        .Text = "URL : " & url & vbCrLf & _
+                                "[Impossible de trouver la zone de contenu]" & vbCrLf
+                    End With
+                Else
+                    ' ➜ Remplir le doc avec tableau + contenu
+                    RemplirDocumentWord wdDoc, htmlDoc, mainNode, url
+                End If
+            End If
+            
         End If
     Next i
     
-    MsgBox "Test terminé. Vous devriez avoir un document Word par URL non vide."
+    MsgBox "Terminé. Vérifiez les documents Word ouverts."
+End Sub
+
+'-------------------------
+' Récupération HTML
+'-------------------------
+Private Function GetHtmlFromUrl(ByVal url As String) As String
+    Dim http As Object
+    
+    On Error GoTo ErrHandler
+    
+    Set http = CreateObject("MSXML2.XMLHTTP")
+    http.Open "GET", url, False
+    http.send
+    
+    If http.Status = 200 Then
+        GetHtmlFromUrl = http.responseText
+    Else
+        GetHtmlFromUrl = ""
+    End If
+    
+    Exit Function
+ErrHandler:
+    GetHtmlFromUrl = ""
+End Function
+
+'-------------------------
+' Zone de contenu principale
+'-------------------------
+Private Function GetMainContentNode(ByVal htmlDoc As Object) As Object
+    Dim node As Object
+    Dim divs As Object
+    Dim i As Long
+    Dim idsToTry As Variant
+    Dim classToTry As Variant
+    
+    On Error Resume Next
+    
+    ' 1) Balise <main>
+    Set node = htmlDoc.getElementsByTagName("main")(0)
+    If Not node Is Nothing Then
+        Set GetMainContentNode = node
+        Exit Function
+    End If
+    
+    ' 2) Ids fréquents
+    idsToTry = Array("content", "main", "primary", "page", "main-content", "content-main")
+    For i = LBound(idsToTry) To UBound(idsToTry)
+        Set node = htmlDoc.getElementById(idsToTry(i))
+        If Not node Is Nothing Then
+            Set GetMainContentNode = node
+            Exit Function
+        End If
+    Next i
+    
+    ' 3) Classes fréquentes
+    classToTry = Array("content", "main-content", "page-content", "article-body")
+    Set divs = htmlDoc.getElementsByTagName("div")
+    For i = 0 To divs.Length - 1
+        Set node = divs.Item(i)
+        If Not node Is Nothing Then
+            If node.className <> "" Then
+                If ClassNameMatch(node.className, classToTry) Then
+                    Set GetMainContentNode = node
+                    Exit Function
+                End If
+            End If
+        End If
+    Next i
+    
+    Set GetMainContentNode = Nothing
+End Function
+
+Private Function ClassNameMatch(ByVal className As String, ByVal classArray As Variant) As Boolean
+    Dim c As Variant
+    Dim lower As String
+    lower = LCase$(className)
+    For Each c In classArray
+        If InStr(1, lower, LCase$(CStr(c)), vbTextCompare) > 0 Then
+            ClassNameMatch = True
+            Exit Function
+        End If
+    Next c
+    ClassNameMatch = False
+End Function
+
+'-------------------------
+' Remplir le doc Word (tableau 2 colonnes)
+'-------------------------
+Private Sub RemplirDocumentWord(ByVal wdDoc As Object, ByVal htmlDoc As Object, ByVal mainNode As Object, ByVal url As String)
+    Dim tbl As Object     ' Word.Table
+    Dim rng As Object     ' Word.Range
+    Dim titre As String
+    Dim metaDesc As String
+    
+    ' Créer tableau 1 ligne / 2 colonnes
+    Set rng = wdDoc.Range(0, 0)
+    Set tbl = wdDoc.Tables.Add(rng, 1, 2)
+    
+    tbl.Cell(1, 1).Range.Text = "Type"
+    tbl.Cell(1, 2).Range.Text = "Texte"
+    
+    ' Métadonnées
+    titre = GetPageTitle(htmlDoc)
+    metaDesc = GetMetaContent(htmlDoc, "description")
+    
+    AddRowToTable tbl, "URL", url
+    If titre <> "" Then AddRowToTable tbl, "META_TITLE", titre
+    If metaDesc <> "" Then AddRowToTable tbl, "META_DESCRIPTION", metaDesc
+    
+    ' Ligne de séparation
+    AddRowToTable tbl, "-----", "-----"
+    
+    ' Parcourir le contenu
+    WalkHtmlNode mainNode, tbl
+End Sub
+
+Private Function GetPageTitle(ByVal htmlDoc As Object) As String
+    On Error Resume Next
+    GetPageTitle = ""
+    If htmlDoc.getElementsByTagName("title").Length > 0 Then
+        GetPageTitle = Trim$(htmlDoc.getElementsByTagName("title")(0).innerText)
+    End If
+End Function
+
+Private Function GetMetaContent(ByVal htmlDoc As Object, ByVal metaName As String) As String
+    Dim metas As Object
+    Dim m As Object
+    GetMetaContent = ""
+    
+    On Error Resume Next
+    Set metas = htmlDoc.getElementsByTagName("meta")
+    If metas Is Nothing Then Exit Function
+    
+    For Each m In metas
+        If LCase$(m.getAttribute("name") & "") = LCase$(metaName) Then
+            GetMetaContent = Trim$(m.getAttribute("content") & "")
+            Exit Function
+        End If
+    Next m
+End Function
+
+'-------------------------
+' Ajout de lignes au tableau
+'-------------------------
+Private Sub AddRowToTable(ByVal tbl As Object, ByVal typeTexte As String, ByVal contenu As String)
+    Dim newRowIndex As Long
+    Dim cellRange As Object
+    
+    If Trim$(contenu) = "" Then Exit Sub
+    
+    newRowIndex = tbl.Rows.Count + 1
+    tbl.Rows.Add
+    
+    tbl.Cell(newRowIndex, 1).Range.Text = typeTexte
+    Set cellRange = tbl.Cell(newRowIndex, 2).Range
+    cellRange.Text = contenu
+    
+    ' enlever le caractère de fin de cellule
+    cellRange.End = cellRange.End - 1
+End Sub
+
+'-------------------------
+' Parcours HTML (H1..H6, P, LISTE, ACCORDEON, reste = P)
+'-------------------------
+Private Sub WalkHtmlNode(ByVal node As Object, ByVal tbl As Object)
+    Dim child As Object
+    Dim li As Object
+    Dim tagName As String
+    Dim className As String
+    
+    For Each child In node.children
+        On Error Resume Next
+        tagName = UCase$(child.tagName & "")
+        className = LCase$(child.className & "")
+        On Error GoTo 0
+        
+        Select Case tagName
+            Case "H1", "H2", "H3", "H4", "H5", "H6"
+                AddRowToTable tbl, tagName, Trim$(child.innerText & "")
+            
+            Case "P"
+                AddRowToTable tbl, "P", Trim$(child.innerText & "")
+            
+            Case "UL", "OL"
+                For Each li In child.getElementsByTagName("li")
+                    AddRowToTable tbl, "LISTE", Trim$(li.innerText & "")
+                Next li
+            
+            Case "DETAILS"
+                AddRowToTable tbl, "ACCORDEON", Trim$(child.innerText & "")
+            
+            Case Else
+                If className <> "" Then
+                    If InStr(1, className, "accordion", vbTextCompare) > 0 _
+                       Or InStr(1, className, "accordeon", vbTextCompare) > 0 Then
+                        AddRowToTable tbl, "ACCORDEON", Trim$(child.innerText & "")
+                    ElseIf child.children.Length > 0 Then
+                        WalkHtmlNode child, tbl
+                    Else
+                        AddRowToTable tbl, "P", Trim$(child.innerText & "")
+                    End If
+                Else
+                    If child.children.Length > 0 Then
+                        WalkHtmlNode child, tbl
+                    Else
+                        AddRowToTable tbl, "P", Trim$(child.innerText & "")
+                    End If
+                End If
+        End Select
+    Next child
 End Sub
