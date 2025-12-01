@@ -1,6 +1,5 @@
 Option Explicit
 
-' Macro principale
 Sub ExporterUrlsVersWord()
     Dim ws As Worksheet
     Dim lastRow As Long, i As Long
@@ -23,50 +22,64 @@ Sub ExporterUrlsVersWord()
     End If
     wdApp.Visible = True
     
-    For i = 1 To lastRow
+    ' 🔹 Je pars de la ligne 2 en supposant une en-tête en A1
+    For i = 2 To lastRow
         url = Trim$(ws.Cells(i, "A").Value)
         If url <> "" Then
+            
+            ' On crée déjà le document Word pour voir si au moins ça marche
+            Set wdDoc = wdApp.Documents.Add
+            
+            ' Titre du doc = URL
+            wdDoc.BuiltInDocumentProperties("Title").Value = url
+            
+            ' Récupération du HTML
             htmlText = GetHtmlFromUrl(url)
-            If htmlText <> "" Then
-                ' Charger le HTML dans un document MSHTML
+            
+            If htmlText = "" Then
+                ' On écrit au moins l'URL + info erreur
+                With wdDoc.Range
+                    .Text = "URL : " & url & vbCrLf & _
+                            "[Aucun contenu HTML récupéré pour cette page]" & vbCrLf
+                End With
+            Else
+                ' Charger le HTML
                 Set htmlDoc = CreateObject("HTMLFile")
                 htmlDoc.Open
                 htmlDoc.Write htmlText
                 htmlDoc.Close
                 
-                ' Trouver la zone de contenu principale
+                ' Zone principale de contenu
                 Set mainNode = GetMainContentNode(htmlDoc)
                 If mainNode Is Nothing Then
-                    ' Si on ne trouve pas, on prend le body
                     On Error Resume Next
                     Set mainNode = htmlDoc.getElementsByTagName("body")(0)
                     On Error GoTo 0
                 End If
                 
-                If Not mainNode Is Nothing Then
-                    ' Créer un nouveau document Word pour cette URL
-                    Set wdDoc = wdApp.Documents.Add
-                    
-                    ' Remplir le document Word (métadonnées + contenu)
+                If mainNode Is Nothing Then
+                    With wdDoc.Range
+                        .Text = "URL : " & url & vbCrLf & _
+                                "[Impossible de trouver la zone de contenu]" & vbCrLf
+                    End With
+                Else
+                    ' Remplir le doc Word avec tableau
                     RemplirDocumentWord wdDoc, htmlDoc, mainNode, url
-                    
-                    ' Facultatif : enregistrer automatiquement
-                    'Dim nomFichier As String
-                    'nomFichier = NettoyerNomFichier("Page_" & CStr(i) & ".docx")
-                    'wdDoc.SaveAs2 ThisWorkbook.Path & "\" & nomFichier
-                    
-                    ' Laisser le document ouvert
                 End If
             End If
+            
         End If
     Next i
     
-    MsgBox "Terminé."
+    MsgBox "Terminé. Vérifiez vos documents Word ouverts."
 End Sub
 
-' Récupération HTML depuis une URL
+'-------------------------
+' Récupération HTML
+'-------------------------
 Private Function GetHtmlFromUrl(ByVal url As String) As String
     Dim http As Object
+    
     On Error GoTo ErrHandler
     
     Set http = CreateObject("MSXML2.XMLHTTP")
@@ -84,9 +97,9 @@ ErrHandler:
     GetHtmlFromUrl = ""
 End Function
 
-' Tente de deviner la zone de contenu principale :
-' - balise <main>
-' - div/id classique : content, main, primary, etc.
+'-------------------------
+' Zone de contenu principale
+'-------------------------
 Private Function GetMainContentNode(ByVal htmlDoc As Object) As Object
     Dim node As Object
     Dim divs As Object
@@ -128,7 +141,6 @@ Private Function GetMainContentNode(ByVal htmlDoc As Object) As Object
         End If
     Next i
     
-    ' 4) Rien trouvé -> Nothing (géré plus haut)
     Set GetMainContentNode = Nothing
 End Function
 
@@ -145,43 +157,37 @@ Private Function ClassNameMatch(ByVal className As String, ByVal classArray As V
     ClassNameMatch = False
 End Function
 
-' Remplir le document Word avec :
-' - un tableau (2 colonnes) : Type / Texte
-' - métadonnées (title, meta description...)
-' - contenu (H1..H6, p, listes, accordéons, reste en p)
+'-------------------------
+' Remplir le doc Word
+'-------------------------
 Private Sub RemplirDocumentWord(ByVal wdDoc As Object, ByVal htmlDoc As Object, ByVal mainNode As Object, ByVal url As String)
     Dim tbl As Object     ' Word.Table
     Dim rng As Object     ' Word.Range
     Dim titre As String
     Dim metaDesc As String
-    Dim metaKeywords As String
     
-    ' Créer un tableau 1 ligne / 2 colonnes, puis on ajoutera les lignes au fur et à mesure
+    ' Créer tableau 1 ligne / 2 colonnes
     Set rng = wdDoc.Range(0, 0)
     Set tbl = wdDoc.Tables.Add(rng, 1, 2)
     
-    ' En-têtes de colonnes
     tbl.Cell(1, 1).Range.Text = "Type"
     tbl.Cell(1, 2).Range.Text = "Texte"
     
     ' Métadonnées
     titre = GetPageTitle(htmlDoc)
     metaDesc = GetMetaContent(htmlDoc, "description")
-    metaKeywords = GetMetaContent(htmlDoc, "keywords")
     
-    If url <> "" Then AddRowToTable tbl, "URL", url, Nothing
+    AddRowToTable tbl, "URL", url, Nothing
     If titre <> "" Then AddRowToTable tbl, "META_TITLE", titre, Nothing
     If metaDesc <> "" Then AddRowToTable tbl, "META_DESCRIPTION", metaDesc, Nothing
-    If metaKeywords <> "" Then AddRowToTable tbl, "META_KEYWORDS", metaKeywords, Nothing
     
-    ' Ajouter une ligne de séparation (optionnel)
+    ' Ligne de séparation
     AddRowToTable tbl, "-----", "-----", Nothing
     
-    ' Parcourir récursivement le contenu
+    ' Parcourir le contenu
     WalkHtmlNode mainNode, tbl
 End Sub
 
-' Récupérer le <title>
 Private Function GetPageTitle(ByVal htmlDoc As Object) As String
     On Error Resume Next
     GetPageTitle = ""
@@ -190,7 +196,6 @@ Private Function GetPageTitle(ByVal htmlDoc As Object) As String
     End If
 End Function
 
-' Récupérer les métas par name=...
 Private Function GetMetaContent(ByVal htmlDoc As Object, ByVal metaName As String) As String
     Dim metas As Object
     Dim m As Object
@@ -208,8 +213,9 @@ Private Function GetMetaContent(ByVal htmlDoc As Object, ByVal metaName As Strin
     Next m
 End Function
 
-' Ajouter une ligne dans le tableau Word
-' elemHtml est facultatif : quand fourni, on tente de garder les liens hypertexte
+'-------------------------
+' Ajout de lignes au tableau
+'-------------------------
 Private Sub AddRowToTable(ByVal tbl As Object, ByVal typeTexte As String, ByVal contenu As String, ByVal elemHtml As Object)
     Dim newRowIndex As Long
     Dim cellRange As Object
@@ -223,16 +229,17 @@ Private Sub AddRowToTable(ByVal tbl As Object, ByVal typeTexte As String, ByVal 
     Set cellRange = tbl.Cell(newRowIndex, 2).Range
     cellRange.Text = contenu
     
-    ' Enlever le caractère de fin de cellule de la zone de travail
+    ' Enlever le caractère de fin de cellule pour travailler proprement
     cellRange.End = cellRange.End - 1
     
-    ' Si on a le noeud HTML, on essaie de re-créer les hyperliens sur le texte
     If Not elemHtml Is Nothing Then
         ApplyHyperlinks elemHtml, cellRange
     End If
 End Sub
 
-' Parcours récursif : H1..H6, P, UL/OL->LI, accordéons, reste = P
+'-------------------------
+' Parcours HTML
+'-------------------------
 Private Sub WalkHtmlNode(ByVal node As Object, ByVal tbl As Object)
     Dim child As Object
     Dim li As Object
@@ -253,30 +260,24 @@ Private Sub WalkHtmlNode(ByVal node As Object, ByVal tbl As Object)
                 AddRowToTable tbl, "P", Trim$(child.innerText & ""), child
             
             Case "UL", "OL"
-                ' Chaque LI devient une ligne "LISTE"
                 For Each li In child.getElementsByTagName("li")
                     AddRowToTable tbl, "LISTE", Trim$(li.innerText & ""), li
                 Next li
             
             Case "DETAILS"
-                ' Accordéon HTML5
                 AddRowToTable tbl, "ACCORDEON", Trim$(child.innerText & ""), child
             
             Case Else
-                ' Détection accordéon par className
                 If className <> "" Then
                     If InStr(1, className, "accordion", vbTextCompare) > 0 _
                        Or InStr(1, className, "accordeon", vbTextCompare) > 0 Then
                         AddRowToTable tbl, "ACCORDEON", Trim$(child.innerText & ""), child
                     ElseIf child.children.Length > 0 Then
-                        ' Descendre dans la hiérarchie
                         WalkHtmlNode child, tbl
                     Else
-                        ' Le reste traité comme un <p>
                         AddRowToTable tbl, "P", Trim$(child.innerText & ""), child
                     End If
                 Else
-                    ' Pas de classe
                     If child.children.Length > 0 Then
                         WalkHtmlNode child, tbl
                     Else
@@ -287,8 +288,9 @@ Private Sub WalkHtmlNode(ByVal node As Object, ByVal tbl As Object)
     Next child
 End Sub
 
-' Conserver les liens hypertexte :
-' pour chaque <a>, on cherche le texte dans la cellule Word et on le transforme en Hyperlink
+'-------------------------
+' Hyperliens
+'-------------------------
 Private Sub ApplyHyperlinks(ByVal elemHtml As Object, ByVal cellRange As Object)
     Dim links As Object
     Dim a As Object
@@ -309,7 +311,6 @@ Private Sub ApplyHyperlinks(ByVal elemHtml As Object, ByVal cellRange As Object)
         
         If href <> "" And anchorText <> "" Then
             Set rngSearch = cellRange.Duplicate
-            ' Exclure le dernier caractère spécial de cellule
             rngSearch.End = rngSearch.End - 1
             
             With rngSearch.Find
@@ -321,20 +322,8 @@ Private Sub ApplyHyperlinks(ByVal elemHtml As Object, ByVal cellRange As Object)
             End With
             
             If found Then
-                ' rngSearch est positionné sur le texte trouvé
                 cellRange.Hyperlinks.Add Anchor:=rngSearch, Address:=href, SubAddress:="", TextToDisplay:=anchorText
             End If
         End If
     Next a
 End Sub
-
-' Optionnel : nettoyer un nom de fichier
-Private Function NettoyerNomFichier(ByVal s As String) As String
-    Dim illegalChars As Variant
-    Dim c As Variant
-    illegalChars = Array("\", "/", ":", "*", "?", """", "<", ">", "|")
-    For Each c In illegalChars
-        s = Replace$(s, CStr(c), "_")
-    Next c
-    NettoyerNomFichier = s
-End Function
